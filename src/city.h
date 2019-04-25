@@ -5,18 +5,26 @@
 
 typedef struct City City;
 typedef struct Road Road;
+typedef struct RoadInfo RoadInfo;
 typedef struct Trie Trie;
+
+struct RoadInfo {
+	const char *city1;
+	const char *city2;
+	int builtYear;
+	unsigned length;
+};
 
 bool cityMakeSpace(City *city);
 bool cityAddRoad(City *city, Road *road);
-bool roadDestroy(Road *road);
-
-bool roadExtend(Trie *t, City *city, const char *str);
-bool roadFind(const City *city1, const City *city2);
-bool roadInsert(Trie *t, Road **road);
-bool roadLink(City *city1, City *city2);
 City *cityInit(Road *road, const char *name);
-Road *roadInit(const char *city1, const char *city2, unsigned len, int year);
+
+bool roadDestroy(Road *road);
+bool roadExtend(Trie *t, City *city, RoadInfo info);
+bool roadLink(City *city1, City *city2, unsigned length, int year);
+bool roadInit(Trie *t, RoadInfo info);
+bool roadUpdate(Road *road, int year);
+Road *roadFind(const City *city1, const City *city2);
 void cityDetach(City *city, const Road *road);
 
 #endif //MAP_CITY_H

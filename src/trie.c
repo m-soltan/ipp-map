@@ -6,10 +6,12 @@
 
 #define SQRT_256 16
 
-typedef struct Key {
+typedef struct Key Key;
+
+struct Key {
 	const char *str;
 	size_t depth;
-} Key;
+};
 
 struct Trie {
 	City *val;
@@ -20,6 +22,7 @@ struct Trie {
 size_t keyLength(Key key);
 Trie **build(Trie ** trie, City **city, Key key, bool *success);
 Trie **getChild(Trie *parent, Key key);
+
 
 // linked function definitions
 Trie **trieInsert(Trie *trie, const char *str, City **city, bool *success) {

@@ -1,14 +1,11 @@
 #include <assert.h>
 #include <string.h>
-#include "leftist.h"
+#include "queue.h"
 #include "map.h"
 #include "trunk.h"
 #include "trie.h"
 
-struct Map {
-	Trunk *routes;
-	Trie *v;
-};
+
 
 // auxiliary function declarations
 bool checkRoad(const City *city1, const City *city2, unsigned length, int builtYear);
@@ -18,8 +15,12 @@ Map *newMap(void) {
 	Map *ans = malloc(sizeof(Map));
 	if (ans) {
 		ans->v = trieInit();
-		if (ans->v)
-			return ans;
+		if (ans->v) {
+			ans->cities = cityMapInit();
+			if (ans->cities)
+				return ans;
+			free(ans->v);
+		}
 		free(ans);
 	}
 	return NULL;
@@ -40,8 +41,8 @@ bool addRoad(Map *map, const char *city1, const char *city2, unsigned length, in
 	info.city1 = (c1 ? NULL : city1);
 	info.city2 = (c2 ? NULL : city2);
 	if (c1 || c2)
-		return roadExtend(map->v, (c1 ? c1 : c2), info);
-	return roadInit(map->v, info);
+		return roadExtend(map->cities, map->v, (c1 ? c1 : c2), info);
+	return roadInit(map->cities, map->v, info);
 }
 
 bool repairRoad(Map *map, const char *city1, const char *city2, int repairYear) {

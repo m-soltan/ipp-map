@@ -2,26 +2,61 @@
 #include <stdlib.h>
 #include <string.h>
 #include "city.h"
+#include "queue.h"
 #include "trunk.h"
 
+#define BUFFER_START_LENGTH 256
+
+typedef struct Record Record;
+
 struct City {
-	size_t nameLen, roadCount, roadMax;
+	size_t id, nameLen, roadCount, roadMax;
 	char *name;
 	Road **roads;
 };
 
+struct CityMap {
+	size_t size, sizeMax;
+	City *cities;
+};
+
+struct Record {
+	bool *seen;
+	City **prev;
+	size_t size;
+};
+
 struct Road {
 	City *city1, *city2;
-	List *routes;
+	Trunk **routes;
 	unsigned length;
 	int year;
 };
 
 // auxiliary function declarations
 bool roadInsert(Trie *t, Road **road);
+City **makeList(City *from, City *to, Record *record, size_t *length);
+City **reverse(City **list, size_t length);
+void recordFree(Record **pRecord);
+Record *recordMake(size_t size);
+//City **shortestPath(City *from, City *to, CityMap *map);
+void initFields(City *city);
+void takeCity(Heap *queue, City *current, size_t distance, Record *record);
 void cityDestroy(City **city);
 
 // linked function definitions
+CityMap *cityMapInit() {
+	CityMap *ans = malloc(sizeof(CityMap));
+	if (ans) {
+		*ans = (CityMap) {.size = 0, .sizeMax = 8};
+		ans->cities = malloc(ans->sizeMax * sizeof(City));
+		if (ans->cities)
+			return ans;
+		free(ans);
+	}
+	return NULL;
+}
+
 bool cityMakeSpace(City *city) {
 	assert(city->roadCount <= city->roadMax);
 	if (city->roadCount < city->roadMax)
@@ -36,12 +71,10 @@ bool cityMakeSpace(City *city) {
 }
 
 bool cityAddRoad(City *city, Road *road) {
-	size_t index;
 	if (!cityMakeSpace(city))
 		return false;
-	index = city->roadCount;
+	city->roads[city->roadCount] = road;
 	++city->roadCount;
-	city->roads[index] = road;
 	return true;
 }
 
@@ -53,12 +86,12 @@ bool roadDestroy(Road *road) {
 	return true;
 }
 
-bool roadExtend(Trie *t, City *city, RoadInfo info) {
+bool roadExtend(CityMap *m, Trie *t, City *city, RoadInfo info) {
 	bool successAdd, successInsert;
 	const char *str = (info.city1 ? info.city1 : info.city2);
 	Road *r = malloc(sizeof(Road));
 	if (r) {
-		City *c = cityInit(r, str);
+		City *c = cityInit(m, str, r);
 		if (c) {
 			successAdd = cityAddRoad(city, r);
 			if (successAdd) {
@@ -79,7 +112,6 @@ bool roadExtend(Trie *t, City *city, RoadInfo info) {
 	return false;
 }
 
-
 // TODO
 bool roadLink(City *city1, City *city2, unsigned length, int year) {
 	if (roadFind(city1, city2) != NULL)
@@ -89,6 +121,8 @@ bool roadLink(City *city1, City *city2, unsigned length, int year) {
 		if (cityAddRoad(city1, r)) {
 			if (cityAddRoad(city2, r)) {
 				*r = (Road) {.length = length, .year = year};
+				r->city1 = (city1 < city2 ? city1 : city2);
+				r->city2 = (city1 < city2 ? city2 : city1);
 				return true;
 			}
 			--city1->roadCount;
@@ -98,32 +132,38 @@ bool roadLink(City *city1, City *city2, unsigned length, int year) {
 	return false;
 }
 
-City *cityInit(Road *road, const char *name) {
-	City *ans = malloc(sizeof(City));
-	if (ans) {
-		ans->roadMax = 8;
-		ans->roads = malloc(ans->roadMax * sizeof(Road));
-		if (ans->roads) {
-			ans->roads[0] = road;
-			ans->roadCount = 1;
-			ans->nameLen = strlen(name);
-			ans->name = malloc(ans->nameLen);
-			if (ans->name) {
-				strncpy(ans->name, name, ans->nameLen);
-				return ans;
-			}
-			free(ans->roads);
-		}
-		free(ans);
+City *cityInit(CityMap *map, const char *name, Road *road) {
+	if (map->size == map->sizeMax) {
+		City *temp = realloc(map->cities, 2 * map->sizeMax);
+		if (!temp)
+			return NULL;
+		map->cities = temp;
+		map->sizeMax *= 2;
 	}
+	City *ans = map->cities + map->size;
+	*ans = (City) {.id = map->size, .nameLen = strlen(name)};
+	initFields(ans);
+	ans->roads = malloc(ans->roadMax * sizeof(Road));
+	if (ans->roads) {
+		ans->roads[0] = road;
+		ans->name = malloc(ans->nameLen);
+		if (ans->name) {
+			strncpy(ans->name, name, ans->nameLen);
+			++map->size;
+			assert(name != NULL);
+			return ans;
+		}
+		free(ans->roads);
+	}
+	free(ans);
 	return NULL;
 }
 
-bool roadInit(Trie *t, RoadInfo info) {
+bool roadInit(CityMap *m, Trie *t, RoadInfo info) {
 	Road *ans = malloc(sizeof(Road));
 	if (!ans)
 		return NULL;
-	City *c1 = cityInit(ans, info.city1), *c2 = cityInit(ans, info.city2);
+	City *c1 = cityInit(m, info.city1, ans), *c2 = cityInit(m, info.city2, ans);
 	if (c1 && c2) {
 		*ans = (Road) {.length = info.length, .year = info.builtYear};
 		ans->city1 = (c1 < c2 ? c1 : c2);
@@ -189,10 +229,115 @@ bool roadInsert(Trie *t, Road **road) {
 	return false;
 }
 
+City **makeList(City *from, City *to, Record *record, size_t *length) {
+	size_t bufferSize = BUFFER_START_LENGTH * sizeof(City *);
+	City *current = to, **buffer = malloc(bufferSize);
+	for (*length = 0; current != from; current = record->prev[current->id]) {
+		if (*length > bufferSize) {
+			City **temp;
+			bufferSize *= 2;
+			temp = realloc(buffer, bufferSize);
+			if (!temp) {
+				free(buffer);
+				return NULL;
+			}
+			buffer = temp;
+		}
+		buffer[*length] = current;
+		++*length;
+		assert(current);
+	}
+	buffer[*length] = from;
+	return buffer;
+}
+
+City **reverse(City **list, size_t length) {
+	City *temp;
+	for (size_t i = 0; i < length - i - 1; ++i) {
+		temp = list[i];
+		list[i] = list[length - i - 1];
+		list[length - i - 1] = temp;
+	}
+	return list;
+}
+
+City **shortestPath(City *from, City *to, CityMap *map) {
+	City *current;
+	Heap *queue;
+	Record *record = recordMake(map->size);
+	size_t length;
+	current = from;
+	if (!record)
+		return NULL;
+	record->prev[from->id] = from;
+	queue = queueInit();
+	if (!queue) {
+		recordFree(&record);
+		return NULL;
+	}
+	for (size_t distance = 0; current != to;) {
+		assert(current != NULL);
+		takeCity(queue, current, distance, record);
+		if (queueEmpty(queue))
+			return NULL;
+		current = queuePop(queue, &distance);
+	}
+	return reverse(makeList(from, to, record, &length), length);
+}
+
+void recordFree(Record **pRecord) {
+	Record *record = *pRecord;
+	free(record->prev);
+	free(record->seen);
+	free(record);
+	*pRecord = NULL;
+}
+
+Record *recordMake(size_t size) {
+	Record *ans = malloc(sizeof(Record));
+	if (ans) {
+		ans->size = size;
+		ans->seen = calloc(size, sizeof(bool));
+		if (ans->seen) {
+			ans->prev = malloc(size * sizeof(City *));
+			if (ans->prev)
+				return ans;
+		}
+		free(ans);
+	}
+	return NULL;
+}
+
+void initFields(City *city) {
+	city->roadCount = 1;
+	city->roadMax = 8;
+}
+
+void takeCity(Heap *queue, City *current, size_t distance, Record *record) {
+	for (size_t i = 0; i < current->roadCount; ++i) {
+		Road *r = current->roads[i];
+		City *nextCity = (r->city1 != current ? r->city1 : r->city2);
+		record->seen[current->id] = true;
+		if (record->seen[nextCity->id])
+			continue;
+		record->prev[nextCity->id] = current;
+		if (r->city1 != current)
+			queuePush(queue, r->city1, distance + r->length);
+		else
+			queuePush(queue, r->city2, distance + r->length);
+	}
+}
+
 void cityDestroy(City **city) {
 	City *p = *city;
 	free(p->name);
 	free(p->roads);
 	free(p);
 	*city = NULL;
+}
+
+void debug(CityMap *m, Trie *t, const char *x, const char *y) {
+	City *c1 = trieFind(t, x);
+	City *c2 = trieFind(t, y);
+	City **res = shortestPath(c1, c2, m);
 }

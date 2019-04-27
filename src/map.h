@@ -12,7 +12,13 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include "city.h"
-//#include "road.h"
+
+// TODO
+struct Map {
+//	Trunk *routes;
+	Trie *v;
+	CityMap *cities;
+};
 
 /**
  * Struktura przechowująca mapę dróg krajowych.

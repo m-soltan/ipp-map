@@ -1,11 +1,12 @@
 #include "map.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
 #undef NDEBUG
 
-#include <assert.h>
+#include "queue.h"
 
 int main() {
 	char const* str;
@@ -14,10 +15,13 @@ int main() {
 	assert(m);
 	
 	// other tests
-	assert(addRoad(m, "A", "B", 1, 2020));
-	assert(addRoad(m, "B", "C", 2, 2020));
-	assert(addRoad(m, "A", "C", 3, 2021));
-	
+//	qTest();
+	addRoad(m, "A", "B", 1, 2020);
+	addRoad(m, "B", "C", 2, 2020);
+	addRoad(m, "C", "A", 3, 2021);
+	addRoad(m, "D", "C", 1, 2222);
+	addRoad(m, "A", "D", 1, 2222);
+	debug(m->cities, m->v, "A", "C");
 //	assert(addRoad(m, "Alinów", "Bór", 1, 2020));
 //	assert(addRoad(m, "Bór", "Cielińsk-Niekłańsk", 2, 2020));
 //	assert(addRoad(m, "Bór", "Dąb Stary", 3, 2020));

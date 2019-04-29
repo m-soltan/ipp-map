@@ -35,7 +35,9 @@ set(SOURCE_FILES
     src/trunk.h)
 
 # Wskazujemy plik wykonywalny.
-add_executable(map ${SOURCE_FILES})
+#add_executable(map ${SOURCE_FILES})
+add_executable(map src/map_main.c src/map.h src/map.c src/trunk.c src/trunk.h src/city.c src/city.h src/trie.c src/trie.h src/queue.c src/queue.h src/global_declarations.h)
+
 
 # Dodajemy obsługę Doxygena: sprawdzamy, czy jest zainstalowany i jeśli tak to:
 find_package(Doxygen)

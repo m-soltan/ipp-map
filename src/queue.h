@@ -4,9 +4,6 @@
 #include <stdbool.h>
 #include "global_declarations.h"
 
-//debug
-void qTest(void);
-
 bool queueEmpty(const Heap *heap);
 bool queuePush(Heap *heap, City *city, City *prev, size_t distance, int minYear);
 City *queuePop(Heap *heap, size_t *distance, int *minYear, City **prev);

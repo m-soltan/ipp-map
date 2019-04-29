@@ -293,7 +293,7 @@ unsigned roadBlock(City *from, City *to) {
 
 void cityDetach(City *city, const Road *road) {
 	Road **last = &city->roads[city->roadCount - 1], *temp = *last;
-	for (int i = 0; i < city->roadCount; ++i) {
+	for (unsigned i = 0; i < city->roadCount; ++i) {
 		if (city->roads[i] == road) {
 			*last = city->roads[i];
 			city->roads[i] = temp;

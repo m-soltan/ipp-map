@@ -31,7 +31,7 @@ bool queueEmpty(const Heap *heap) {
 
 bool queuePush(Heap *heap, City *city, City *prev, size_t distance, int minYear) {
 	bool adjustSuccess = queueAdjust(heap);
-	Node *arr = heap->v, *ptr = &arr[heap->size];
+	Node *arr = heap->v;
 	if (!adjustSuccess)
 		return false;
 	++heap->size;
@@ -42,12 +42,6 @@ bool queuePush(Heap *heap, City *city, City *prev, size_t distance, int minYear)
 		Node temp = heap->v[i];
 		heap->v[i] = heap->v[parent(i)];
 		heap->v[parent(i)] = temp;
-//		Node temp;
-//		if (greater(&heap->v[parent(i)], &heap->v[i])) {
-//			temp = heap->v[i];
-//			heap->v[i] = heap->v[parent(i)];
-//			heap->v[parent(i)] = temp;
-//		}
 	}
 	assert(heap->v[1].city);
 	return true;
@@ -127,17 +121,4 @@ size_t parent(size_t x) {
 
 size_t right(size_t x) {
 	return 1 + x * 2;
-}
-
-void qTest(void) {
-	Heap *h = queueInit();
-	int minYear;
-	size_t a, b, c, dist;
-//	queuePush(h, (City *) 1, 1, 1);
-//	queuePush(h, (City *) 3, 3, 3);
-//	queuePush(h, (City *) 2, 2, 2);
-//	a = (size_t) queuePop(h, &dist, &minYear);
-//	b = (size_t) queuePop(h, &dist, &minYear);
-//	c = (size_t) queuePop(h, &dist, &minYear);
-	
 }

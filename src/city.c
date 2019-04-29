@@ -478,6 +478,7 @@ void cityDestroy(City **city, CityMap *cityMap) {
 	}
 	free(temp->name);
 	free(temp->roads);
+	free(*city);
 	--cityMap->length;
 	*city = NULL;
 }

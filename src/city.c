@@ -217,7 +217,7 @@ City *cityInit(CityMap *map, const char *name, Road *road) {
 		c->roads[0] = road;
 		c->name = malloc(c->nameLength);
 		if (c->name) {
-			strncpy(c->name, name, c->nameLength);
+			strcpy(c->name, name);
 			c->name[c->nameLength - 1] = '\0';
 			++map->length;
 			return c;

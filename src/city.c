@@ -42,7 +42,7 @@ struct Road {
 bool cityMapAdjust(CityMap *cityMap);
 bool roadInsert(CityMap *cityMap, Trie *t, Road **road, Trunk *trunks[1000]);
 City **makeList(City *from, City *to, Record *record, size_t *length);
-City **reverse(City **list, size_t length);
+void reverse(City **list, size_t length);
 void recordFree(Record **pRecord);
 Record *recordMake(size_t size);
 void initFields(City *city);
@@ -374,21 +374,21 @@ City **makeList(City *from, City *to, Record *record, size_t *length) {
 		++*length;
 		assert(current);
 	}
+	reverse(buffer, *length);
 	return buffer;
 }
 
-City **reverse(City **list, size_t length) {
+void reverse(City **list, size_t length) {
 	City *temp;
 	for (size_t i = 0; i < length - i - 1; ++i) {
 		temp = list[i];
 		list[i] = list[length - i - 1];
 		list[length - i - 1] = temp;
 	}
-	return list;
 }
 
 City **cityPath(City *from, City *to, CityMap *map, size_t *length) {
-	City **ans, **list, *check = NULL, *current, *prev, *ptrBack;
+	City **ans, *check = NULL, *current, *prev, *ptrBack;
 	size_t d1, d2 = SIZE_MAX;
 	Heap *queue;
 	int minYear = INT16_MAX, minYear2 = INT16_MAX;
@@ -415,12 +415,10 @@ City **cityPath(City *from, City *to, CityMap *map, size_t *length) {
 	}
 	if (!queueEmpty(queue))
 		check = queuePop(queue, &d2, &minYear2, &prev);
-	if (check == to && d2 == d1 && minYear2 == minYear) {
+	if (check == to && d2 == d1 && minYear2 == minYear)
 		ans = NULL;
-	} else {
-		list = makeList(from, to, record, length);
-		ans = reverse(list, *length);
-	}
+	else
+		ans = makeList(from, to, record, length);
 	queueDestroy(&queue);
 	recordFree(&record);
 	return ans;

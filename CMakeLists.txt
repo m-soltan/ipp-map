@@ -7,7 +7,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif ()
 
 # Nie chcemy oglądać komunikatów o procentowym postępie kompilacji.
-set_property(GLOBAL PROPERTY RULE_MESSAGES OFF)
+#set_property(GLOBAL PROPERTY RULE_MESSAGES OFF)
 
 # Chcemy zobaczyć polecenia wywołane przez make.
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -35,14 +35,12 @@ set(SOURCE_FILES
     src/trunk.h)
 
 # Wskazujemy plik wykonywalny.
-#add_executable(map ${SOURCE_FILES})
-add_executable(map src/map_main.c src/map.h src/map.c src/trunk.c src/trunk.h src/city.c src/city.h src/trie.c src/trie.h src/queue.c src/queue.h src/global_declarations.h)
-
+add_executable(map ${SOURCE_FILES})
 
 # Dodajemy obsługę Doxygena: sprawdzamy, czy jest zainstalowany i jeśli tak to:
 find_package(Doxygen)
 if (DOXYGEN_FOUND)
-    # Wskazujemy lokalizacją pliku konfiguracyjnego i podajemy jego docelową lokalizację w folderze, gdzie następuje kompilacja.
+    # Wskazujemy lokalizację pliku konfiguracyjnego i podajemy jego docelową lokalizację w folderze, gdzie następuje kompilacja.
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
     # Dodajemy cel doc: użycie make doc spowoduje wywołanie doxygena z odpowiednim plikiem konfiguracyjnym w folderze kompilacji.
     # Na wyjście zostanie wypisany odpowiedni komentarz.

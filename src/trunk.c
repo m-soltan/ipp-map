@@ -13,7 +13,7 @@ struct Trunk {
 // auxiliary function declarations
 bool trunkAdjust(Trunk *t);
 size_t trunkDescriptionLength(const Trunk *trunk);
-Trunk *trunkJoin(Trunk *trunk1, Trunk *trunk2);
+Trunk *trunkJoin(Trunk *trunk, Trunk *extension);
 
 // linked function definitions
 bool trunkHasCity(const Trunk *trunk, const City *city) {
@@ -145,28 +145,29 @@ size_t trunkDescriptionLength(const Trunk *trunk) {
 	return ans;
 }
 
-Trunk *trunkJoin(Trunk *trunk1, Trunk *trunk2) {
+Trunk *trunkJoin(Trunk *trunk, Trunk *extension) {
 	City *first2, *last1;
 	Trunk *ans = malloc(sizeof(Trunk)), *prefix, *suffix;
 	if (ans) {
-		ans->length = trunk1->length + trunk2->length - 1;
+		ans->length = trunk->length + extension->length - 1;
 		ans->cities = malloc(ans->length * sizeof(City *));
 		if (ans->cities) {
-			first2 = trunk2->cities[0];
-			last1 = trunk1->cities[trunk1->length - 1];
-			prefix = (last1 == first2 ? trunk1 : trunk2);
-			suffix = (last1 == first2 ? trunk2 : trunk1);
+			first2 = extension->cities[0];
+			last1 = trunk->cities[trunk->length - 1];
+			prefix = (last1 == first2 ? trunk : extension);
+			suffix = (last1 == first2 ? extension : trunk);
 			size_t i = 0;
 			for (i = 0; i < prefix->length; ++i)
 				ans->cities[i] = prefix->cities[i];
 			for (size_t j = 1; j < suffix->length; ++j)
 				ans->cities[i + j - 1] = suffix->cities[j];
-			ans->id = trunk1->id;
-			assert(ans->id == trunk2->id);
+			ans->id = trunk->id;
+			assert(ans->id == extension->id);
+			free(extension);
 			return ans;
 		}
 		free(ans);
+		free(extension);
 	}
-	assert(false);
 	return NULL;
 }

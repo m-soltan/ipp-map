@@ -42,7 +42,6 @@ void deleteMap(Map *map) {
 		if (map->routes[i] != NULL)
 			trunkFree(&map->routes[i]);
 	}
-//	TODO
 	free(map);
 }
 
@@ -108,12 +107,12 @@ bool extendRoute(Map *map, unsigned routeId, const char *city) {
 			ans = true;
 		}
 		trunkUnblock(route, lengths);
+		free(route);
 		free(lengths);
 	}
 	return ans;
 }
 
-// TODO
 bool removeRoad(Map *map, const char *city1, const char *city2) {
 	City *c1 = trieFind(map->v, city1), *c2 = trieFind(map->v, city2);
 	Road *r;

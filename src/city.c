@@ -80,6 +80,9 @@ void cityMapDestroy(CityMap **pCityMap) {
 		}
 		cityDestroy(c, temp);
 	}
+	free((*pCityMap)->cities);
+	free(*pCityMap);
+	*pCityMap = NULL;
 }
 
 bool cityMakeSpace(City *city) {
@@ -385,7 +388,7 @@ City **reverse(City **list, size_t length) {
 }
 
 City **cityPath(City *from, City *to, CityMap *map, size_t *length) {
-	City **ans, *check = NULL, *current, *prev, *ptrBack;
+	City **ans, **list, *check = NULL, *current, *prev, *ptrBack;
 	size_t d1, d2 = SIZE_MAX;
 	Heap *queue;
 	int minYear = INT16_MAX, minYear2 = INT16_MAX;
@@ -412,10 +415,12 @@ City **cityPath(City *from, City *to, CityMap *map, size_t *length) {
 	}
 	if (!queueEmpty(queue))
 		check = queuePop(queue, &d2, &minYear2, &prev);
-	if (check == to && d2 == d1 && minYear2 == minYear)
+	if (check == to && d2 == d1 && minYear2 == minYear) {
 		ans = NULL;
-	else
-		ans = reverse(makeList(from, to, record, length), *length);
+	} else {
+		list = makeList(from, to, record, length);
+		ans = reverse(list, *length);
+	}
 	queueDestroy(&queue);
 	recordFree(&record);
 	return ans;

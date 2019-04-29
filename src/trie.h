@@ -1,10 +1,7 @@
 #ifndef MAP_TRIE_H
 #define MAP_TRIE_H
 #include <stdbool.h>
-#include "city.h"
-
-typedef struct City City;
-typedef struct Trie Trie;
+#include "global_declarations.h"
 
 Trie **trieInsert(Trie *trie, const char *str, City **city, bool *success);
 City *trieFind(Trie *x, const char *str);

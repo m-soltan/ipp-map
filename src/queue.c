@@ -11,13 +11,15 @@ struct Heap {
 
 
 struct Node {
-	City *city;
+	City *city, *prev;
+	int minYear;
 	size_t s;
 };
 
 // auxiliary function declarations
-bool adjust(Heap *heap);
-size_t getS(Heap *heap, size_t index);
+bool queueAdjust(Heap *heap);
+bool greater(const Heap *heap, size_t lhs, size_t rhs);
+
 size_t left(size_t x);
 size_t parent(size_t x);
 size_t right(size_t x);
@@ -27,39 +29,48 @@ bool queueEmpty(const Heap *heap) {
 	return heap->size == 0;
 }
 
-bool queuePush(Heap *heap, City *city, size_t distance) {
-	bool adjustSuccess = adjust(heap);
+bool queuePush(Heap *heap, City *city, City *prev, size_t distance, int minYear) {
+	bool adjustSuccess = queueAdjust(heap);
+	Node *arr = heap->v, *ptr = &arr[heap->size];
 	if (!adjustSuccess)
 		return false;
 	++heap->size;
-	heap->v[heap->size] = (Node) {.city = city, .s = distance};
-	for (size_t i = heap->size; i > 1; i = parent(i)) {
-		Node temp;
-		if (heap->v[parent(i)].s > heap->v[i].s) {
-			temp = heap->v[i];
-			heap->v[i] = heap->v[parent(i)];
-			heap->v[parent(i)] = temp;
-		}
+	arr[heap->size] = (Node) {.city = city, .s = distance, .minYear = minYear, .prev = prev};
+	for (size_t i = heap->size; true; i = parent(i)) {
+		if (greater(heap, i, parent(i)))
+			break;
+		Node temp = heap->v[i];
+		heap->v[i] = heap->v[parent(i)];
+		heap->v[parent(i)] = temp;
+//		Node temp;
+//		if (greater(&heap->v[parent(i)], &heap->v[i])) {
+//			temp = heap->v[i];
+//			heap->v[i] = heap->v[parent(i)];
+//			heap->v[parent(i)] = temp;
+//		}
 	}
+	assert(heap->v[1].city);
 	return true;
 }
 
-City *queuePeek(Heap *heap) {
-	assert(!queueEmpty(heap));
-	return heap->v[1].city;
-}
-
-City *queuePop(Heap *heap, size_t *distance) {
-	Node ans = heap->v[1];
-	heap->v[1] = heap->v[heap->size];
-	for (size_t i = parent(heap->size); i <= heap->size;) {
-		size_t l = getS(heap, left(i)), r = getS(heap, right(i));
-		i = (l < r ? left : right)(i);
-		if (heap->v[parent(i)].s < heap->v[i].s)
+City *queuePop(Heap *heap, size_t *distance, int *minYear, City **prev) {
+	Node *arr = heap->v, ans;
+	size_t temp;
+	ans = arr[1];
+	temp = heap->size;
+	for (size_t i = 1, next; true; i = next) {
+		if (greater(heap, left(i), temp) && greater(heap, right(i), temp)) {
+			arr[i] = arr[heap->size];
 			break;
-		heap->v[parent(i)] = heap->v[i];
+		}
+		next = (greater(heap, left(i), right(i)) ? right : left)(i);
+		arr[i] = arr[next];
 	}
+	assert(heap->size == 0 || heap->v[1].city);
 	--heap->size;
+	*distance = ans.s;
+	*minYear = ans.minYear;
+	*prev = ans.prev;
 	return ans.city;
 }
 
@@ -75,8 +86,14 @@ Heap *queueInit(void) {
 	return NULL;
 }
 
+void queueDestroy(Heap **pHeap) {
+	free((*pHeap)->v);
+	free(*pHeap);
+	*pHeap = NULL;
+}
+
 // auxiliary function definitions
-bool adjust(Heap *heap) {
+bool queueAdjust(Heap *heap) {
 	assert(heap && heap->sizeMax > heap->size);
 	if (heap->size < heap->sizeMax)
 		return true;
@@ -90,11 +107,14 @@ bool adjust(Heap *heap) {
 	}
 }
 
-size_t getS(Heap *heap, size_t index) {
-	if (index && index <= heap->size)
-		return heap->v[index].s;
+bool greater(const Heap *heap, size_t lhs, size_t rhs) {
+	if (lhs > heap->size || rhs > heap->size || rhs < 1 || lhs < 1)
+		return lhs > heap->size || rhs < 1;
+	Node *lNode = &heap->v[lhs], *rNode = &heap->v[rhs];
+	if (lNode->s == rNode->s)
+		return (lNode->minYear < rNode->minYear);
 	else
-		return SIZE_MAX;
+		return lNode->s > rNode->s;
 }
 
 size_t left(size_t x) {
@@ -111,12 +131,13 @@ size_t right(size_t x) {
 
 void qTest(void) {
 	Heap *h = queueInit();
+	int minYear;
 	size_t a, b, c, dist;
-	queuePush(h, (City *) 1, 1);
-	queuePush(h, (City *) 3, 3);
-	queuePush(h, (City *) 2, 2);
-	a = (size_t) queuePop(h, &dist);
-	b = (size_t) queuePop(h, &dist);
-	c = (size_t) queuePop(h, &dist);
+//	queuePush(h, (City *) 1, 1, 1);
+//	queuePush(h, (City *) 3, 3, 3);
+//	queuePush(h, (City *) 2, 2, 2);
+//	a = (size_t) queuePop(h, &dist, &minYear);
+//	b = (size_t) queuePop(h, &dist, &minYear);
+//	c = (size_t) queuePop(h, &dist, &minYear);
 	
 }

@@ -1,11 +1,18 @@
 #include <assert.h>
 #include <string.h>
-#include "queue.h"
+#include "city.h"
 #include "map.h"
+#include "queue.h"
 #include "trunk.h"
 #include "trie.h"
 
+#define ROUTE_ID_MAX 999
 
+struct Map {
+	CityMap *cities;
+	Trunk *routes[1 + ROUTE_ID_MAX];
+	Trie *v;
+};
 
 // auxiliary function declarations
 bool checkRoad(const City *city1, const City *city2, unsigned length, int builtYear);
@@ -14,7 +21,7 @@ bool checkRoad(const City *city1, const City *city2, unsigned length, int builtY
 Map *newMap(void) {
 	Map *ans = malloc(sizeof(Map));
 	if (ans) {
-		ans->v = trieInit();
+		*ans = (Map) {.v = trieInit()};
 		if (ans->v) {
 			ans->cities = cityMapInit();
 			if (ans->cities)
@@ -26,9 +33,17 @@ Map *newMap(void) {
 	return NULL;
 }
 
-// TODO
 void deleteMap(Map *map) {
-
+	if (map == NULL)
+		return;
+	cityMapDestroy(&map->cities);
+	trieDestroy(&map->v);
+	for (int i = 0; i <= ROUTE_ID_MAX; ++i) {
+		if (map->routes[i] != NULL)
+			trunkFree(&map->routes[i]);
+	}
+//	TODO
+	free(map);
 }
 
 bool addRoad(Map *map, const char *city1, const char *city2, unsigned length, int builtYear) {
@@ -41,8 +56,8 @@ bool addRoad(Map *map, const char *city1, const char *city2, unsigned length, in
 	info.city1 = (c1 ? NULL : city1);
 	info.city2 = (c2 ? NULL : city2);
 	if (c1 || c2)
-		return roadExtend(map->cities, map->v, (c1 ? c1 : c2), info);
-	return roadInit(map->cities, map->v, info);
+		return roadExtend(map->cities, map->v, (c1 != NULL ? c1 : c2), info);
+	return roadInit(map->cities, map->v, info, map->routes);
 }
 
 bool repairRoad(Map *map, const char *city1, const char *city2, int repairYear) {
@@ -59,25 +74,61 @@ bool repairRoad(Map *map, const char *city1, const char *city2, int repairYear) 
 	return roadUpdate(r, repairYear);
 }
 
-// TODO
 bool newRoute(Map *map, unsigned routeId, const char *city1, const char *city2) {
-	return 0;
+	City *c1, *c2;
+	Trunk *route;
+	c1 = trieFind(map->v, city1);
+	c2 = trieFind(map->v, city2);
+	if (!c1 || !c2 || routeId > ROUTE_ID_MAX || map->routes[routeId] != NULL)
+		return false;
+	route = trunkBuild(c1, c2, map->cities, routeId);
+	if (route == NULL)
+		return false;
+	map->routes[routeId] = route;
+	trunkAttach(route);
+	return true;
 }
 
-// TODO
 bool extendRoute(Map *map, unsigned routeId, const char *city) {
-	return 0;
+	bool ans = false;
+	City *c;
+	Trunk *extension, *route;
+	unsigned *lengths;
+	if (routeId > 999)
+		return false;
+	c = trieFind(map->v, city);
+	route = map->routes[routeId];
+	if (trunkHasCity(route, c))
+		return false;
+	lengths = trunkBlock(route);
+	if (lengths != NULL) {
+		extension = trunkExtend(map->cities, route, c);
+		if (extension != NULL) {
+			map->routes[routeId] = extension;
+			ans = true;
+		}
+		trunkUnblock(route, lengths);
+		free(lengths);
+	}
+	return ans;
 }
 
 // TODO
 bool removeRoad(Map *map, const char *city1, const char *city2) {
-	
-	return 0;
+	City *c1 = trieFind(map->v, city1), *c2 = trieFind(map->v, city2);
+	Road *r;
+	if (!c1 || !c2)
+		return false;
+	r = roadFind(c1, c2);
+	if (!r)
+		return false;
+	return roadDestroy(map->cities, r, map->routes);
 }
 
-// TODO
 const char *getRouteDescription(Map *map, unsigned routeId) {
-	return NULL;
+	Trunk *route = map->routes[routeId];
+	const char *ans = trunkDescription(route);
+	return ans;
 }
 
 // auxiliary function definitions

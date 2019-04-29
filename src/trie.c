@@ -26,9 +26,11 @@ Trie **getChild(Trie *parent, Key key);
 
 // linked function definitions
 Trie **trieInsert(Trie *trie, const char *str, City **city, bool *success) {
-	if (trieFind(trie, str))
-		return NULL;
 	Trie **child = NULL;
+	if (trieFind(trie, str)) {
+		*success = false;
+		return NULL;
+	}
 	for (size_t depth = 0; str[depth / 2]; ++depth) {
 		child = getChild(trie, (Key) {.str = str, .depth = depth});
 		if (*child) {
@@ -39,6 +41,7 @@ Trie **trieInsert(Trie *trie, const char *str, City **city, bool *success) {
 	}
 	assert(child && !trie->val);
 	trie->val = *city;
+	*success = true;
 	return child;
 }
 

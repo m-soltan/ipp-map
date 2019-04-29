@@ -1,60 +1,84 @@
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "city.h"
 #include "queue.h"
+#include "trie.h"
 #include "trunk.h"
 
 #define BUFFER_START_LENGTH 256
+#define INIT_ROUTE_MAX 8
 
 typedef struct Record Record;
 
 struct City {
-	size_t id, nameLen, roadCount, roadMax;
+	bool blocked;
+	size_t id, nameLength, roadCount, roadMax;
 	char *name;
 	Road **roads;
 };
 
 struct CityMap {
-	size_t size, sizeMax;
-	City *cities;
+	size_t length, lengthMax;
+	City **cities;
 };
 
 struct Record {
 	bool *seen;
 	City **prev;
-	size_t size;
 };
 
 struct Road {
 	City *city1, *city2;
-	Trunk **routes;
+	size_t *routes;
 	unsigned length;
 	int year;
+	size_t routeCount, routeMax;
 };
 
 // auxiliary function declarations
-bool roadInsert(Trie *t, Road **road);
+bool cityMapAdjust(CityMap *cityMap);
+bool roadInsert(CityMap *cityMap, Trie *t, Road **road, Trunk *trunks[1000]);
 City **makeList(City *from, City *to, Record *record, size_t *length);
 City **reverse(City **list, size_t length);
 void recordFree(Record **pRecord);
 Record *recordMake(size_t size);
-//City **shortestPath(City *from, City *to, CityMap *map);
 void initFields(City *city);
-void takeCity(Heap *queue, City *current, size_t distance, Record *record);
-void cityDestroy(City **city);
+void visit(Heap *queue, City *current, size_t distance, Record *record, int minYear);
+void cityDestroy(City **city, CityMap *cityMap);
 
 // linked function definitions
 CityMap *cityMapInit() {
 	CityMap *ans = malloc(sizeof(CityMap));
 	if (ans) {
-		*ans = (CityMap) {.size = 0, .sizeMax = 8};
-		ans->cities = malloc(ans->sizeMax * sizeof(City));
+		*ans = (CityMap) {.length = 0, .lengthMax = 8};
+		ans->cities = malloc(ans->lengthMax * sizeof(City *));
 		if (ans->cities)
 			return ans;
 		free(ans);
 	}
 	return NULL;
+}
+
+void cityMapDestroy(CityMap **pCityMap) {
+	CityMap *temp = *pCityMap;
+	while (temp->length > 0) {
+		City **c = &temp->cities[temp->length - 1];
+		while ((*c)->roadCount > 0) {
+			Road *r = (*c)->roads[(*c)->roadCount - 1];
+			cityDetach(*c, r);
+			if (r->city1 == *c)
+				r->city1 = NULL;
+			else
+				r->city2 = NULL;
+			if (r->city1 == NULL && r->city2 == NULL) {
+				free(r->routes);
+				free(r);
+			}
+		}
+		cityDestroy(c, temp);
+	}
 }
 
 bool cityMakeSpace(City *city) {
@@ -78,11 +102,58 @@ bool cityAddRoad(City *city, Road *road) {
 	return true;
 }
 
-// TODO
-bool roadDestroy(Road *road) {
-	City *city1 = road->city1, *city2 = road->city2;
-	cityDetach(city1, road);
-	cityDetach(city2, road);
+size_t cityGetNameLength(const City *city) {
+	return city->nameLength - 1;
+}
+
+void cityGetName(char *dest, const City *city) {
+	strncpy(dest, city->name, city->nameLength);
+}
+
+bool roadAdjust(const City *from, const City *to) {
+	Road *road = roadFind(from, to);
+	assert(road);
+	if (road->routeCount < road->routeMax)
+		return true;
+	if (road->routes == NULL) {
+		road->routes = malloc(INIT_ROUTE_MAX * sizeof(Trunk *));
+		if (road->routes) {
+			road->routeMax = INIT_ROUTE_MAX;
+			return true;
+		} else {
+			return false;
+		}
+	}
+	assert(road->routeMax != 0);
+	size_t *temp = realloc(road->routes, 2 * road->routeMax * sizeof(size_t));
+	if (!temp)
+		return false;
+	road->routes = temp;
+	road->routeMax *= 2;
+	return true;
+}
+
+bool roadDestroy(CityMap *cityMap, Road *road, Trunk *trunks[1000]) {
+	if (road->routes != NULL) {
+		Trunk **replacements = malloc(road->routeCount * sizeof(Trunk *));
+		size_t length = road->length;
+		if (!replacements)
+			return false;
+		road->length = 0;
+		for (size_t i = 0; i < road->routeCount; ++i) {
+			Trunk *t = trunks[road->routes[i]];
+			replacements[i] = trunkDetour(cityMap, t);
+			if (replacements[i] == NULL) {
+				road->length = length;
+				for (size_t j = 0; j < i; ++j)
+					trunkFree(&replacements[i]);
+				free(replacements);
+				return false;
+			}
+		}
+	}
+	cityDetach(road->city1, road);
+	cityDetach(road->city2, road);
 	return true;
 }
 
@@ -105,14 +176,13 @@ bool roadExtend(CityMap *m, Trie *t, City *city, RoadInfo info) {
 				}
 				cityDetach(city, r);
 			}
-			cityDestroy(&c);
+			cityDestroy(&c, m);
 		}
 		free(r);
 	}
 	return false;
 }
 
-// TODO
 bool roadLink(City *city1, City *city2, unsigned length, int year) {
 	if (roadFind(city1, city2) != NULL)
 		return false;
@@ -133,39 +203,38 @@ bool roadLink(City *city1, City *city2, unsigned length, int year) {
 }
 
 City *cityInit(CityMap *map, const char *name, Road *road) {
-	if (map->size == map->sizeMax) {
-		City *temp = realloc(map->cities, 2 * map->sizeMax);
-		if (!temp)
-			return NULL;
-		map->cities = temp;
-		map->sizeMax *= 2;
-	}
-	City *ans = map->cities + map->size;
-	*ans = (City) {.id = map->size, .nameLen = strlen(name)};
-	initFields(ans);
-	ans->roads = malloc(ans->roadMax * sizeof(Road));
-	if (ans->roads) {
-		ans->roads[0] = road;
-		ans->name = malloc(ans->nameLen);
-		if (ans->name) {
-			strncpy(ans->name, name, ans->nameLen);
-			++map->size;
-			assert(name != NULL);
-			return ans;
+	City **ans, *c;
+	assert(name != NULL);
+	cityMapAdjust(map);
+	ans = &map->cities[map->length];
+	*ans = malloc(sizeof(City));
+	**ans = (City) {.id = map->length, .nameLength = 1 + strlen(name)};
+	c = *ans;
+	initFields(c);
+	c->roads = malloc(c->roadMax * sizeof(Road));
+	if (c->roads) {
+		c->roads[0] = road;
+		c->name = malloc(c->nameLength);
+		if (c->name) {
+			strncpy(c->name, name, c->nameLength);
+			c->name[c->nameLength - 1] = '\0';
+			++map->length;
+			return c;
 		}
-		free(ans->roads);
+		free(c->roads);
 	}
-	free(ans);
 	return NULL;
 }
 
-bool roadInit(CityMap *m, Trie *t, RoadInfo info) {
+bool roadInit(CityMap *m, Trie *t, RoadInfo info, Trunk *trunks[1000]) {
 	Road *ans = malloc(sizeof(Road));
 	if (!ans)
 		return NULL;
 	City *c1 = cityInit(m, info.city1, ans), *c2 = cityInit(m, info.city2, ans);
 	if (c1 && c2) {
 		*ans = (Road) {.length = info.length, .year = info.builtYear};
+		ans->routeCount = 0;
+		ans->routeMax = 0;
 		ans->city1 = (c1 < c2 ? c1 : c2);
 		ans->city2 = (c1 < c2 ? c2 : c1);
 	} else {
@@ -175,16 +244,21 @@ bool roadInit(CityMap *m, Trie *t, RoadInfo info) {
 			free(c1);
 		if (c2)
 			free(c2);
+		return NULL;
 	}
-	return roadInsert(t, &ans);
+	return roadInsert(m, t, &ans, trunks);
 }
 
 bool roadUpdate(Road *road, int year) {
-	if (year != 0) {
+	if (year != 0 && year >= road->year) {
 		road->year = year;
 		return true;
 	}
 	return false;
+}
+
+int roadGetYear(const Road *road) {
+	return road->year;
 }
 
 Road * roadFind(const City *city1, const City *city2) {
@@ -201,6 +275,22 @@ Road * roadFind(const City *city1, const City *city2) {
 	return NULL;
 }
 
+size_t roadWrite(char *str, const City *city1, const City *city2) {
+	int ans;
+	Road *road = roadFind(city1, city2);
+	ans = sprintf(str, ";%u;%i;%s", road->length, road->year, city2->name);
+	assert(ans > 0);
+	return (size_t) ans;
+}
+
+unsigned roadBlock(City *from, City *to) {
+	Road *road = roadFind(from, to);
+	unsigned ans = road->length;
+	from->blocked = to->blocked = true;
+	road->length = 0;
+	return ans;
+}
+
 void cityDetach(City *city, const Road *road) {
 	Road **last = &city->roads[city->roadCount - 1], *temp = *last;
 	for (int i = 0; i < city->roadCount; ++i) {
@@ -212,8 +302,38 @@ void cityDetach(City *city, const Road *road) {
 	}
 }
 
+void roadTrunkAdd(Road *r, size_t trunk) {
+	assert(r->routeCount < r->routeMax);
+	r->routes[r->routeCount] = trunk;
+	++r->routeCount;
+}
+
+void roadUnblock(Road *road, unsigned length) {
+	assert(road->length == 0);
+	road->city1->blocked = road->city2->blocked = false;
+	road->length = length;
+}
+
 // auxiliary function definitions
-bool roadInsert(Trie *t, Road **road) {
+bool cityMapAdjust(CityMap *cityMap) {
+	City **temp;
+	size_t size;
+	if (cityMap->length == cityMap->lengthMax) {
+		assert(cityMap->lengthMax);
+		size = 2 * cityMap->lengthMax;
+		temp = realloc(cityMap->cities, size * sizeof(City *));
+		if (temp != NULL) {
+			cityMap->cities = temp;
+			cityMap->lengthMax *= 2;
+			return true;
+		} else {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool roadInsert(CityMap *cityMap, Trie *t, Road **road, Trunk *trunks[1000]) {
 	bool success1, success2;
 	Trie **parent1;
 	City 	**city1 = &(*road)->city1, **city2 = &(*road)->city2;
@@ -225,14 +345,17 @@ bool roadInsert(Trie *t, Road **road) {
 		if (parent1)
 			trieDestroy(parent1);
 	}
-	roadDestroy(*road);
+	roadDestroy(cityMap, *road, trunks);
 	return false;
 }
 
 City **makeList(City *from, City *to, Record *record, size_t *length) {
 	size_t bufferSize = BUFFER_START_LENGTH * sizeof(City *);
-	City *current = to, **buffer = malloc(bufferSize);
-	for (*length = 0; current != from; current = record->prev[current->id]) {
+	size_t ansLength = 1;
+	for (City *c = to; c != from; c = record->prev[c->id])
+		++ansLength;
+	City *current = to, **buffer = malloc(ansLength * sizeof(City *));
+	for (*length = 0; *length < ansLength; current = record->prev[current->id]) {
 		if (*length > bufferSize) {
 			City **temp;
 			bufferSize *= 2;
@@ -247,7 +370,6 @@ City **makeList(City *from, City *to, Record *record, size_t *length) {
 		++*length;
 		assert(current);
 	}
-	buffer[*length] = from;
 	return buffer;
 }
 
@@ -261,11 +383,12 @@ City **reverse(City **list, size_t length) {
 	return list;
 }
 
-City **shortestPath(City *from, City *to, CityMap *map) {
-	City *current;
+City **cityPath(City *from, City *to, CityMap *map, size_t *length) {
+	City **ans, *check = NULL, *current, *prev, *ptrBack;
+	size_t d1, d2 = SIZE_MAX;
 	Heap *queue;
-	Record *record = recordMake(map->size);
-	size_t length;
+	int minYear = INT16_MAX, minYear2 = INT16_MAX;
+	Record *record = recordMake(map->length);
 	current = from;
 	if (!record)
 		return NULL;
@@ -275,14 +398,26 @@ City **shortestPath(City *from, City *to, CityMap *map) {
 		recordFree(&record);
 		return NULL;
 	}
-	for (size_t distance = 0; current != to;) {
+	for (d1 = 0; current != to;) {
 		assert(current != NULL);
-		takeCity(queue, current, distance, record);
-		if (queueEmpty(queue))
+		visit(queue, current, d1, record, minYear);
+		if (queueEmpty(queue)) {
+			queueDestroy(&queue);
+			recordFree(&record);
 			return NULL;
-		current = queuePop(queue, &distance);
+		}
+		current = queuePop(queue, &d1, &minYear, &ptrBack);
+		record->prev[current->id] = ptrBack;
 	}
-	return reverse(makeList(from, to, record, &length), length);
+	if (!queueEmpty(queue))
+		check = queuePop(queue, &d2, &minYear2, &prev);
+	if (check == to && d2 == d1 && minYear2 == minYear)
+		ans = NULL;
+	else
+		ans = reverse(makeList(from, to, record, length), *length);
+	queueDestroy(&queue);
+	recordFree(&record);
+	return ans;
 }
 
 void recordFree(Record **pRecord) {
@@ -296,7 +431,6 @@ void recordFree(Record **pRecord) {
 Record *recordMake(size_t size) {
 	Record *ans = malloc(sizeof(Record));
 	if (ans) {
-		ans->size = size;
 		ans->seen = calloc(size, sizeof(bool));
 		if (ans->seen) {
 			ans->prev = malloc(size * sizeof(City *));
@@ -309,35 +443,37 @@ Record *recordMake(size_t size) {
 }
 
 void initFields(City *city) {
+	city->blocked = false;
 	city->roadCount = 1;
 	city->roadMax = 8;
 }
 
-void takeCity(Heap *queue, City *current, size_t distance, Record *record) {
+void visit(Heap *queue, City *current, size_t distance, Record *record, int minYear) {
 	for (size_t i = 0; i < current->roadCount; ++i) {
 		Road *r = current->roads[i];
+		if (r->length == 0)
+			continue;
+		minYear = (roadGetYear(r) < minYear ? roadGetYear(r) : minYear);
 		City *nextCity = (r->city1 != current ? r->city1 : r->city2);
 		record->seen[current->id] = true;
-		if (record->seen[nextCity->id])
+		if (record->seen[nextCity->id] || nextCity->blocked)
 			continue;
-		record->prev[nextCity->id] = current;
 		if (r->city1 != current)
-			queuePush(queue, r->city1, distance + r->length);
+			queuePush(queue, r->city1, current, distance + r->length, minYear);
 		else
-			queuePush(queue, r->city2, distance + r->length);
+			queuePush(queue, r->city2, current, distance + r->length, minYear);
 	}
 }
 
-void cityDestroy(City **city) {
-	City *p = *city;
-	free(p->name);
-	free(p->roads);
-	free(p);
+void cityDestroy(City **city, CityMap *cityMap) {
+	City **last = cityMap->cities + cityMap->length - 1, *temp = *last;
+	if (*city != *last) {
+		temp->id = (*city)->id;
+		*last = *city;
+		*city = temp;
+	}
+	free(temp->name);
+	free(temp->roads);
+	--cityMap->length;
 	*city = NULL;
-}
-
-void debug(CityMap *m, Trie *t, const char *x, const char *y) {
-	City *c1 = trieFind(t, x);
-	City *c2 = trieFind(t, y);
-	City **res = shortestPath(c1, c2, m);
 }

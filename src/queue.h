@@ -2,17 +2,15 @@
 #define MAP_QUEUE_H
 
 #include <stdbool.h>
-#include "city.h"
-
-typedef struct Heap Heap;
+#include "global_declarations.h"
 
 //debug
 void qTest(void);
 
 bool queueEmpty(const Heap *heap);
-bool queuePush(Heap *heap, City *city, size_t distance);
-City *queuePeek(Heap *heap);
-City *queuePop(Heap *heap, size_t *distance);
+bool queuePush(Heap *heap, City *city, City *prev, size_t distance, int minYear);
+City *queuePop(Heap *heap, size_t *distance, int *minYear, City **prev);
 Heap *queueInit(void);
+void queueDestroy(Heap **pHeap);
 
 #endif //MAP_QUEUE_H

@@ -30,7 +30,7 @@ const char *trunkDescription(const Trunk *trunk) {
 	temp = ans = malloc(size);
 	if (ans) {
 		temp += sprintf(temp, "%zu;", trunk->id);
-		assert(temp - ans <= strlen("999;"));
+		assert(temp <= strlen("999;") + ans);
 		cityGetName(temp, trunk->cities[0]);
 		temp += cityGetNameLength(trunk->cities[0]);
 		for (size_t i = 1; i < trunk->length; ++i) {

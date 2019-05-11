@@ -11,8 +11,10 @@ struct Heap {
 
 
 struct Node {
-	City *city, *prev;
+	City *city;
+	Road *last;
 	int minYear;
+	char pad[sizeof(size_t) - sizeof(int)];
 	size_t s;
 };
 
@@ -29,13 +31,13 @@ bool queueEmpty(const Heap *heap) {
 	return heap->size == 0;
 }
 
-bool queuePush(Heap *heap, City *city, City *prev, size_t distance, int minYear) {
+bool queuePush(Heap *heap, Road *road, City *city, size_t distance, int minYear) {
 	bool adjustSuccess = queueAdjust(heap);
 	Node *arr = heap->v;
 	if (!adjustSuccess)
 		return false;
 	++heap->size;
-	arr[heap->size] = (Node) {.city = city, .s = distance, .minYear = minYear, .prev = prev};
+	arr[heap->size] = (Node) {.city = city, .s = distance, .minYear = minYear, .last = road};
 	for (size_t i = heap->size; true; i = parent(i)) {
 		if (greater(heap, i, parent(i)))
 			break;
@@ -47,7 +49,7 @@ bool queuePush(Heap *heap, City *city, City *prev, size_t distance, int minYear)
 	return true;
 }
 
-City *queuePop(Heap *heap, size_t *distance, int *minYear, City **prev) {
+Road *queuePop(Heap *heap, size_t *distance, int *minYear, City **pCity) {
 	Node *arr = heap->v, ans;
 	size_t temp;
 	ans = arr[1];
@@ -60,15 +62,15 @@ City *queuePop(Heap *heap, size_t *distance, int *minYear, City **prev) {
 		next = (greater(heap, left(i), right(i)) ? right : left)(i);
 		arr[i] = arr[next];
 	}
-	assert(heap->size == 0 || heap->v[1].city);
+	assert(heap->size == 0 || heap->v[1].city != NULL);
 	--heap->size;
 	*distance = ans.s;
 	*minYear = ans.minYear;
-	*prev = ans.prev;
-	return ans.city;
+	*pCity = ans.city;
+	return ans.last;
 }
 
-Heap *queueInit(void) {
+Heap *queueInit() {
 	Heap *ans = malloc(sizeof(Heap));
 	if (ans) {
 		*ans = (Heap) {.size = 0, .sizeMax = 8};

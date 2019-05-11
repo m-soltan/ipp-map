@@ -3,91 +3,105 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include "city.h"
+#include "city_map.h"
+#include "road.h"
 #include "trunk.h"
 
 struct Trunk {
+	City *first,*last;
+	unsigned id;
+	char pad[sizeof(size_t) - sizeof(unsigned)];
+	size_t length;
+	Road **roads;
+};
+
+struct TrunkOld {
 	size_t length, id;
 	City **cities;
 };
-// auxiliary function declarations
-bool trunkAdjust(Trunk *t);
-size_t trunkDescriptionLength(const Trunk *trunk);
-Trunk *trunkJoin(Trunk *trunk, Trunk *extension);
+
+static size_t descriptionLength(const Trunk *trunk);
+static Trunk *join(Trunk *trunk, Trunk *extension);
+static Trunk makeDetour(CityMap *cityMap, Trunk *trunk, Road *road);
+static Trunk *makeExtension(CityMap *cityMap, Trunk *trunk, City *city);
+static void merge(Trunk *result, Trunk *base, Trunk *infix);
+static void append(Trunk *prefix, Trunk *suffix, Trunk *result);
 
 // linked function definitions
 bool trunkHasCity(const Trunk *trunk, const City *city) {
 	for (size_t i = 0; i < trunk->length; ++i) {
-		if (trunk->cities[i] == city)
+		City *city1, *city2;
+		roadGetCities(trunk->roads[i], &city1, &city2);
+		if (city1 == city || city == city2)
 			return true;
 	}
 	return false;
 }
 
 const char *trunkDescription(const Trunk *trunk) {
-	char *ans, *temp;
-	size_t size = trunkDescriptionLength(trunk);
-	temp = ans = malloc(size);
+	char *ans, *tmp;
+	size_t size = descriptionLength(trunk);
+	tmp = ans = malloc(size);
 	if (ans) {
-		temp += sprintf(temp, "%zu;", trunk->id);
-		assert(temp <= strlen("999;") + ans);
-		cityGetName(temp, trunk->cities[0]);
-		temp += cityGetNameLength(trunk->cities[0]);
-		for (size_t i = 1; i < trunk->length; ++i) {
-			temp += roadWrite(temp, trunk->cities[i - 1], trunk->cities[i]);
+		City *current = trunk->first;
+		tmp += sprintf(tmp, "%u;", trunk->id);
+		assert(tmp <= strlen("999;") + ans);
+		tmp += cityGetName(tmp, trunk->first);
+		for (size_t i = 0; i < trunk->length; ++i) {
+			Road *road = trunk->roads[i];
+			current = roadGetOther(road, current);
+			tmp += roadWrite(tmp, road, current);
 		}
 	}
 	return ans;
 }
 
-unsigned *trunkBlock(Trunk *trunk) {
-	unsigned *ans;
-	size_t size = (trunk->length - 1) * sizeof(unsigned);
-	ans = malloc(size);
-	if (ans) {
-		for (size_t i = 0, j = 1; j < trunk->length; ++i, ++j) {
-			ans[i] = roadBlock(trunk->cities[i], trunk->cities[j]);
-		}
+void trunkBlock(Trunk *trunk) {
+	for (size_t i = 0; i < trunk->length; i += 2) {
+		City *city1, *city2;
+		roadGetCities(trunk->roads[i], &city1, &city2);
+		cityBlock(city1);
+		cityBlock(city2);
 	}
-	return ans;
+	if (trunk->length % 2 == 0)
+		cityBlock(trunk->last);
 }
 
 void trunkAttach(Trunk *trunk) {
-	for (size_t i = 1; i < trunk->length; ++i) {
-		Road *r = roadFind(trunk->cities[i - 1], trunk->cities[i]);
-		roadTrunkAdd(r, trunk->id);
-	}
+	for (size_t i = 1; i < trunk->length; ++i)
+		roadTrunkAdd(trunk->roads[i], trunk->id);
 }
 
+// TODO: distinguish no route and no memory
 Trunk *trunkBuild(City *from, City *to, CityMap *m, unsigned number) {
-	bool adjustSuccess;
 	Trunk *ans = malloc(sizeof(Trunk));
 	if (ans) {
-		ans->cities = cityPath(from, to, m, &ans->length);
+		ans->roads = cityPath(from, to, m, &ans->length);
 		ans->id = number;
-		if (ans->cities) {
-			adjustSuccess = trunkAdjust(ans);
-			if (adjustSuccess)
-				return ans;
-			free(ans->cities);
-		}
+		if (ans->roads)
+			return ans;
 		free(ans);
 	}
 	return NULL;
 }
 
-Trunk *trunkDetour(CityMap *cMap, Trunk *trunk) {
-	bool adjustSuccess;
-	Trunk *ans = malloc(sizeof(Trunk));
-	City *from = trunk->cities[0], *to = trunk->cities[trunk->length - 1];
+Trunk *trunkDetour(CityMap *cityMap, Trunk *trunk, Road *road) {
+	Trunk *ans = malloc(sizeof(TrunkOld));
 	if (ans) {
-		ans->cities = cityPath(from, to, cMap, &ans->length);
-		ans->id = trunk->id;
-		if (ans->cities) {
-			adjustSuccess = trunkAdjust(ans);
-			if (adjustSuccess)
+		Trunk detour = makeDetour(cityMap, trunk, road);
+		if (detour.roads) {
+			ans->id = trunk->id;
+			ans->length = detour.length + trunk->length;
+			ans->id = trunk->id;
+			ans->roads = malloc(ans->length * sizeof(City *));
+			if (ans->roads) {
+				merge(ans, trunk, &detour);
+				free(detour.roads);
 				return ans;
-			free(ans->cities);
+			}
+			free(detour.roads);
 		}
 		free(ans);
 	}
@@ -95,72 +109,55 @@ Trunk *trunkDetour(CityMap *cMap, Trunk *trunk) {
 }
 
 Trunk *trunkExtend(CityMap *cityMap, Trunk *trunk, City *city) {
-	size_t last = trunk->length - 1, len1, len2;
-	Trunk *extension1, *extension2;
-	extension1 = trunkBuild(city, trunk->cities[0], cityMap, trunk->id);
-	extension2 = trunkBuild(trunk->cities[last], city, cityMap, trunk->id);
-	if (extension1 == NULL && extension2 == NULL)
-		return NULL;
-	if (extension1 == NULL || extension2 == NULL) {
-		return trunkJoin(trunk, (extension1 == NULL ? extension2 : extension1));
-	}
-	len1 = extension1->length;
-	len2 = extension2->length;
-	free(len1 > len2 ? extension1 : extension2);
-	return trunkJoin(trunk, (len1 > len2 ? extension2 : extension1));
+	Trunk *extension;
+	extension = makeExtension(cityMap, trunk, city);
+	return join(trunk, extension);
 }
 
 void trunkFree(Trunk **pTrunk) {
 	Trunk *trunk = *pTrunk;
 	*pTrunk = NULL;
-	free(trunk->cities);
+	free(trunk->roads);
 	free(trunk);
 }
 
-void trunkUnblock(Trunk *trunk, unsigned *lengths) {
-	for (size_t i = 0, j = 1; j < trunk->length; ++i, ++j) {
-		Road *r = roadFind(trunk->cities[i], trunk->cities[j]);
-		roadUnblock(r, lengths[i]);
+void trunkUnblock(Trunk *trunk) {
+	for (size_t i = 0; i < trunk->length; i += 2) {
+		City *city1, *city2;
+		roadGetCities(trunk->roads[i], &city1, &city2);
+		cityUnblock(city1);
+		cityUnblock(city2);
 	}
+	if (trunk->length % 2 == 0)
+		cityUnblock(trunk->last);
 }
 
-// auxiliary function definitions
-bool trunkAdjust(Trunk *t) {
-	for (size_t i = 1; i < t->length; ++i) {
-		bool adjustSuccess = roadAdjust(t->cities[i - 1], t->cities[i]);
-		if (!adjustSuccess) {
-			return false;
-		}
-	}
-	return true;
-}
-
-size_t trunkDescriptionLength(const Trunk *trunk) {
+static size_t descriptionLength(const Trunk *trunk) {
 	size_t ans = strlen("999;");
-	for (size_t i = 0; i < trunk->length; ++i) {
-		ans += cityGetNameLength(trunk->cities[i]) + strlen(";");
-		ans += 3 * sizeof(unsigned) + strlen(";");
-		ans += 3 * sizeof(int) + strlen(";");
+	const size_t lengthLen = 3 * sizeof(unsigned) + strlen(";");
+	const size_t yearLen = 3 * sizeof(int) + strlen(";");
+	ans += trunk->length * (lengthLen + yearLen + strlen(";"));
+	for (size_t i = 0; i < trunk->length; i += 2) {
+		City *city1, *city2;
+		roadGetCities(trunk->roads[i], &city1, &city2);
+		ans += cityGetNameLength(city1);
+		ans += cityGetNameLength(city2);
 	}
+	if (trunk->length % 2 == 0)
+		ans += cityGetNameLength(trunk->last);
 	return ans;
 }
 
-Trunk *trunkJoin(Trunk *trunk, Trunk *extension) {
-	City *first2, *last1;
-	Trunk *ans = malloc(sizeof(Trunk)), *prefix, *suffix;
+static Trunk *join(Trunk *trunk, Trunk *extension) {
+	Trunk *ans = malloc(sizeof(Trunk));
 	if (ans) {
-		ans->length = trunk->length + extension->length - 1;
-		ans->cities = malloc(ans->length * sizeof(City *));
-		if (ans->cities) {
-			first2 = extension->cities[0];
-			last1 = trunk->cities[trunk->length - 1];
-			prefix = (last1 == first2 ? trunk : extension);
-			suffix = (last1 == first2 ? extension : trunk);
-			size_t i = 0;
-			for (i = 0; i < prefix->length; ++i)
-				ans->cities[i] = prefix->cities[i];
-			for (size_t j = 1; j < suffix->length; ++j)
-				ans->cities[i + j - 1] = suffix->cities[j];
+		ans->length = trunk->length + extension->length;
+		ans->roads = malloc(ans->length * sizeof(City *));
+		if (ans->roads) {
+			if (trunk->last == extension->first)
+				append(trunk, extension, ans);
+			else
+				append(extension, trunk, ans);
 			ans->id = trunk->id;
 			assert(ans->id == extension->id);
 			free(extension);
@@ -169,5 +166,63 @@ Trunk *trunkJoin(Trunk *trunk, Trunk *extension) {
 		free(ans);
 		free(extension);
 	}
+	return NULL;
+}
+
+// TODO: reserve space for the detour
+Trunk makeDetour(CityMap *cityMap, Trunk *trunk, Road *road) {
+	City *from, *to;
+	Trunk ans;
+	unsigned length;
+	roadGetCities(road, &from, &to);
+	trunkBlock(trunk);
+	length = roadBlock(road);
+	ans.roads = cityPath(from, to, cityMap, &ans.length);
+	roadUnblock(road, length);
+	trunkUnblock(trunk);
+	return ans;
+}
+
+static void merge(Trunk *result, Trunk *base, Trunk *infix) {
+	size_t ansI, trunkI;
+	for (ansI = trunkI = 0; true; ++ansI, ++trunkI) {
+		if (base->roads[trunkI] == infix->roads[0])
+			break;
+		assert(trunkI < base->length);
+		result->roads[ansI] = base->roads[trunkI];
+	}
+	assert(ansI == trunkI);
+	for (; ansI - trunkI < infix->length; ++ansI)
+		result->roads[ansI] = infix->roads[ansI - trunkI];
+	for (; ansI < result->length; ++ansI, ++trunkI)
+		result->roads[ansI] = base->roads[trunkI];
+}
+
+void append(Trunk *prefix, Trunk *suffix, Trunk *result) {
+	for (size_t i = 0; i < prefix->length; ++i)
+		result->roads[i] = prefix->roads[i];
+	for (size_t i = 0; i < suffix->length; ++i)
+		result->roads[prefix->length + i] = suffix->roads[i];
+}
+
+Trunk *makeExtension(CityMap *cityMap, Trunk *trunk, City *city) {
+	Trunk *ans, *trunk1, *trunk2;
+	ans = trunk1 = trunkBuild(city, trunk->first, cityMap, trunk->id);
+	if (trunk1 == NULL)
+		return NULL;
+	trunk2 = trunkBuild(trunk->last, city, cityMap, trunk->id);
+	if (trunk2 == NULL) {
+		free(trunk1);
+		return NULL;
+	}
+	if (trunk1->length < trunk2->length)
+		trunk1 = trunk2;
+	else
+		ans = trunk2;
+	assert(ans != trunk1);
+	free(trunk1);
+	if (ans->length != SIZE_MAX)
+		return ans;
+	free(ans);
 	return NULL;
 }

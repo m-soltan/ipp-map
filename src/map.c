@@ -1,6 +1,6 @@
 #include <assert.h>
 #include <string.h>
-#include "city.h"
+#include "city_map.h"
 #include "map.h"
 #include "queue.h"
 #include "trunk.h"
@@ -13,9 +13,6 @@ struct Map {
 	Trunk *routes[1 + ROUTE_ID_MAX];
 	Trie *v;
 };
-
-// auxiliary function declarations
-bool checkRoad(const City *city1, const City *city2, unsigned length, int builtYear);
 
 // linked function definitions
 Map *newMap(void) {
@@ -56,19 +53,18 @@ bool addRoad(Map *map, const char *city1, const char *city2, unsigned length, in
 	info.city2 = (c2 ? NULL : city2);
 	if (c1 || c2)
 		return roadExtend(map->cities, map->v, (c1 != NULL ? c1 : c2), info);
-	return roadInit(map->cities, map->v, info, map->routes);
+	return roadInit(map->cities, map->v, info);
 }
 
 bool repairRoad(Map *map, const char *city1, const char *city2, int repairYear) {
-	bool b;
 	City *c1, *c2;
 	Road *r;
 	c1 = trieFind(map->v, city1);
 	c2 = trieFind(map->v, city2);
-	b = c1 && c2;
-	if (!b)
+	if (!c1 || !c2)
 		return false;
-	if ((r = roadFind(c1, c2)) == NULL)
+	r = roadFind(c1, c2);
+	if (r == NULL)
 		return false;
 	return roadUpdate(r, repairYear);
 }
@@ -92,24 +88,20 @@ bool extendRoute(Map *map, unsigned routeId, const char *city) {
 	bool ans = false;
 	City *c;
 	Trunk *extension, *route;
-	unsigned *lengths;
 	if (routeId > 999)
 		return false;
 	c = trieFind(map->v, city);
 	route = map->routes[routeId];
 	if (trunkHasCity(route, c))
 		return false;
-	lengths = trunkBlock(route);
-	if (lengths != NULL) {
-		extension = trunkExtend(map->cities, route, c);
-		if (extension != NULL) {
-			map->routes[routeId] = extension;
-			ans = true;
-		}
-		trunkUnblock(route, lengths);
-		free(route);
-		free(lengths);
+	trunkBlock(route);
+	extension = trunkExtend(map->cities, route, c);
+	if (extension != NULL) {
+		map->routes[routeId] = extension;
+		ans = true;
 	}
+	trunkUnblock(route);
+	free(route);
 	return ans;
 }
 
@@ -128,12 +120,4 @@ const char *getRouteDescription(Map *map, unsigned routeId) {
 	Trunk *route = map->routes[routeId];
 	const char *ans = trunkDescription(route);
 	return ans;
-}
-
-// auxiliary function definitions
-bool checkRoad(const City *city1, const City *city2, unsigned length, int builtYear) {
-	if (builtYear == 0 || length == 0 || city1 == city2)
-		return false;
-	else
-		return !roadFind(city1, city2);
 }

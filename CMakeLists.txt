@@ -6,6 +6,10 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif ()
 
+OPTION(-B "" 1)
+
+SET(CMAKE_C_COMPILER /usr/bin/clang)
+
 # Nie chcemy oglądać komunikatów o procentowym postępie kompilacji.
 #set_property(GLOBAL PROPERTY RULE_MESSAGES OFF)
 
@@ -13,7 +17,7 @@ endif ()
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # Ustawiamy wspólne opcje kompilowania dla wszystkich wariantów projektu.
-set(CMAKE_C_FLAGS "-std=c11 -Wall -Wextra")
+set(CMAKE_C_FLAGS "-std=c11 -Wall -Wextra -Weverything")
 # Domyślne opcje dla wariantów Release i Debug są sensowne.
 # Jeśli to konieczne, ustawiamy tu inne.
 # set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
@@ -21,8 +25,8 @@ set(CMAKE_C_FLAGS "-std=c11 -Wall -Wextra")
 
 # Wskazujemy pliki źródłowe.
 set(SOURCE_FILES
-    src/city.c
-    src/city.h
+    src/city_map.c
+    src/city_map.h
     src/global_declarations.h
     src/map.c
     src/map.h
@@ -32,7 +36,14 @@ set(SOURCE_FILES
     src/trie.c
     src/trie.h
     src/trunk.c
-    src/trunk.h)
+    src/trunk.h
+#    src/test.c
+#    src/test.h
+    src/road.c
+    src/road.h
+    src/city.c
+    src/city.h
+)
 
 # Wskazujemy plik wykonywalny.
 add_executable(map ${SOURCE_FILES})

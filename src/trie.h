@@ -5,7 +5,7 @@
 
 Trie **trieInsert(Trie *trie, const char *str, City **city, bool *success);
 City *trieFind(Trie *x, const char *str);
-Trie *trieInit();
+Trie *trieInit(void);
 void trieDestroy(Trie **x);
 
 #endif //MAP_TRIE_H

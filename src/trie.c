@@ -106,7 +106,7 @@ Trie **getChild(Trie *parent, Key key) {
 	Trie **ans;
 	uint8_t childNumber;
 	assert(parent);
-	childNumber = key.str[key.depth / 2];
+	childNumber = (uint8_t) key.str[key.depth / 2];
 	if (key.depth % 2 == 0)
 		childNumber /= SQRT_256;
 	childNumber %= SQRT_256;

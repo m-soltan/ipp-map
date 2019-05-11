@@ -6,8 +6,8 @@
  * @date 20.03.2019
  */
 
-#ifndef __MAP_H__
-#define __MAP_H__
+#ifndef MAP_MAP_H
+#define MAP_MAP_H
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -139,4 +139,4 @@ bool removeRoad(Map *map, const char *city1, const char *city2);
  */
 const char * getRouteDescription(Map *map, unsigned routeId);
 
-#endif /* __MAP_H__ */
+#endif /* MAP_MAP_H */

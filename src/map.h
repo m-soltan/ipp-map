@@ -13,11 +13,6 @@
 #include <stdlib.h>
 #include "global_declarations.h"
 
-/**
- * Struktura przechowująca mapę dróg krajowych.
- */
-typedef struct Map Map;
-
 /** @brief Tworzy nową strukturę.
  * Tworzy nową, pustą strukturę niezawierającą żadnych miast, odcinków dróg ani
  * dróg krajowych.
@@ -138,5 +133,8 @@ bool removeRoad(Map *map, const char *city1, const char *city2);
  * @return Wskaźnik na napis lub NULL, gdy nie udało się zaalokować pamięci.
  */
 const char * getRouteDescription(Map *map, unsigned routeId);
+
+// TODO: separation
+void destroyTrunk(Trunk *trunks[ROUTE_LIMIT], unsigned trunkId);
 
 #endif /* MAP_MAP_H */

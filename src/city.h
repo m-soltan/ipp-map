@@ -8,8 +8,9 @@
 
 bool cityConnectRoad(City *city, Road *road);
 bool cityMakeRoad(City *city1, City *city2, Road *road);
-City *cityInit(CityMap *map, const char *name, Road *road);
-Road *cityRoadTo(const City *city1, const City *city2);
+Road *roadFind(City *city1, City *city2);
+City *cityInit(CityMap *cityMap, const char *name, Road *road);
+
 Road **cityPath(City *from, City *to, CityMap *cityMap, size_t *length);
 size_t cityGetName(char *dest, const City *city);
 size_t cityGetNameLength(const City *city);

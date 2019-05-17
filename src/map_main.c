@@ -22,7 +22,7 @@
 #define WRONG_TEST 2
 #define MEM_PASS 13
 
-/* Liczba elementów tablicy x */
+/* x length */
 #define SIZE(x) (sizeof(x) / sizeof(x)[0])
 
 /* Sprawdzenie poprawności opisu drogi krajowej **/

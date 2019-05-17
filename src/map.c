@@ -1,18 +1,18 @@
-#include <assert.h>
-#include <string.h>
+#include "city.h"
 #include "city_map.h"
 #include "map.h"
 #include "queue.h"
+#include "road.h"
 #include "trunk.h"
 #include "trie.h"
 
-#define ROUTE_ID_MAX 999
-
 struct Map {
 	CityMap *cities;
-	Trunk *routes[1 + ROUTE_ID_MAX];
+	Trunk *routes[ROUTE_LIMIT];
 	Trie *v;
 };
+
+static bool destroyRoad(Map *map, Road *road);
 
 // linked function definitions
 Map *newMap(void) {
@@ -35,7 +35,7 @@ void deleteMap(Map *map) {
 		return;
 	cityMapDestroy(&map->cities);
 	trieDestroy(&map->v);
-	for (int i = 0; i <= ROUTE_ID_MAX; ++i) {
+	for (int i = 0; i < ROUTE_LIMIT; ++i) {
 		if (map->routes[i] != NULL)
 			trunkFree(&map->routes[i]);
 	}
@@ -53,7 +53,7 @@ bool addRoad(Map *map, const char *city1, const char *city2, unsigned length, in
 	info.city2 = (c2 ? NULL : city2);
 	if (c1 || c2)
 		return roadExtend(map->cities, map->v, (c1 != NULL ? c1 : c2), info);
-	return roadInit(map->cities, map->v, info);
+	return cityMapLoneRoad(map->cities, map->v, info);
 }
 
 bool repairRoad(Map *map, const char *city1, const char *city2, int repairYear) {
@@ -74,14 +74,15 @@ bool newRoute(Map *map, unsigned routeId, const char *city1, const char *city2) 
 	Trunk *route;
 	c1 = trieFind(map->v, city1);
 	c2 = trieFind(map->v, city2);
-	if (!c1 || !c2 || routeId > ROUTE_ID_MAX || map->routes[routeId] != NULL)
-		return false;
-	route = trunkBuild(c1, c2, map->cities, routeId);
-	if (route == NULL)
-		return false;
-	map->routes[routeId] = route;
-	trunkAttach(route);
-	return true;
+	if (c1 && c2 && routeId < ROUTE_LIMIT && map->routes[routeId] == NULL) {
+		route = trunkBuild(c1, c2, map->cities, routeId);
+		if (route) {
+			map->routes[routeId] = route;
+			trunkAttach(route);
+			return true;
+		}
+	}
+	return false;
 }
 
 bool extendRoute(Map *map, unsigned routeId, const char *city) {
@@ -108,16 +109,51 @@ bool extendRoute(Map *map, unsigned routeId, const char *city) {
 bool removeRoad(Map *map, const char *city1, const char *city2) {
 	City *c1 = trieFind(map->v, city1), *c2 = trieFind(map->v, city2);
 	Road *r;
-	if (!c1 || !c2)
+	if (c1 == NULL || c2 == NULL)
 		return false;
 	r = roadFind(c1, c2);
-	if (!r)
+	if (r == NULL)
 		return false;
-	return roadDestroy(map->cities, r, map->routes);
+	return destroyRoad(map, r);
 }
 
 const char *getRouteDescription(Map *map, unsigned routeId) {
 	Trunk *route = map->routes[routeId];
 	const char *ans = trunkDescription(route);
 	return ans;
+}
+
+Trunk **rebuildTrunks(CityMap *cityMap, Road *road, Trunk *trunks[ROUTE_LIMIT]) {
+	unsigned routeCount = roadRouteCount(road);
+	assert(routeCount > 0);
+	Trunk **replacements = malloc(routeCount * sizeof(Trunk *));
+	if (replacements == NULL)
+		return NULL;
+	const unsigned *routeIds = roadGetRoutes(road);
+	for (size_t i = 0; i < routeCount; ++i) {
+		Trunk *trunk = trunks[routeIds[i]];
+		replacements[i] = trunkAddDetour(cityMap, trunk, road);
+		if (replacements[i] == NULL) {
+			for (size_t j = 0; j < i; ++j)
+				trunkFree(&replacements[i]);
+			free(replacements);
+			return NULL;
+		}
+	}
+	return replacements;
+}
+
+void destroyTrunk(Trunk *trunks[ROUTE_LIMIT], unsigned trunkId) {
+	trunkDestroy(&trunks[trunkId]);
+}
+
+static bool destroyRoad(Map *map, Road *road) {
+	const unsigned routeCount = roadRouteCount(road);
+	if (routeCount > 0) {
+		bool moveSuccess = roadMoveTrunks(map->cities, map->routes, road);
+		if (!moveSuccess)
+			return false;
+	}
+	roadDisconnect(road);
+	return true;
 }

@@ -10,7 +10,7 @@ typedef struct Key Key;
 
 struct Key {
 	const char *str;
-	size_t depth;
+	size_t depth, length;
 };
 
 struct Trie {
@@ -18,8 +18,6 @@ struct Trie {
 	Trie *children[SQRT_256];
 };
 
-// auxiliary function declarations
-size_t keyLength(Key key);
 Trie **build(Trie ** trie, City **city, Key key, bool *success);
 Trie **getChild(Trie *parent, Key key);
 
@@ -31,12 +29,13 @@ Trie **trieInsert(Trie *trie, const char *str, City **city, bool *success) {
 		*success = false;
 		return NULL;
 	}
-	for (size_t depth = 0; str[depth / 2]; ++depth) {
-		child = getChild(trie, (Key) {.str = str, .depth = depth});
+	Key key = (Key) {.str = str, .length = strlen(str)};
+	for (key.depth = 0; str[key.depth / 2]; ++key.depth) {
+		child = getChild(trie, key);
 		if (*child) {
 			trie = *child;
 		} else {
-			return build(&trie, city, (Key) {.str = str, .depth = depth}, success);
+			return build(&trie, city, key, success);
 		}
 	}
 	assert(child && !trie->val);
@@ -46,9 +45,10 @@ Trie **trieInsert(Trie *trie, const char *str, City **city, bool *success) {
 }
 
 City *trieFind(Trie *x, const char *str) {
+	Key key = (Key) {.str = str, .length = strlen(str)};
 	Trie *child = x;
-	for (size_t depth = 0; str[depth / 2]; ++depth) {
-		child = *getChild(x, (Key) {.str = str, .depth = depth});
+	for (; str[key.depth / 2]; ++key.depth) {
+		child = *getChild(x, key);
 		if (child)
 			x = child;
 		else
@@ -77,17 +77,9 @@ void trieDestroy(Trie **x) {
 }
 
 
-// auxiliary function definitions
-size_t keyLength(Key key) {
-	size_t ans = strlen(key.str);
-	assert(ans <= SIZE_MAX / 2);
-	ans *= 2;
-	return ans;
-}
-
-Trie **build(Trie **trie, City **city, Key key, bool *success) {
-	Trie **current = trie;
-	for (size_t n = keyLength(key); key.depth < n; ++key.depth) {
+Trie **build(Trie **const trie, City **city, Key key, bool *success) {
+	Trie **ans = getChild(*trie, key), **current = trie;
+	for (const size_t n = key.length * 2; key.depth < n; ++key.depth) {
 		current = getChild(*current, key);
 		*current = trieInit();
 		if (!*current) {
@@ -99,13 +91,15 @@ Trie **build(Trie **trie, City **city, Key key, bool *success) {
 	}
 	(*current)->val = *city;
 	*success = true;
-	return *trie ? getChild(*trie, key) : NULL;
+	return ans;
 }
 
 Trie **getChild(Trie *parent, Key key) {
 	Trie **ans;
 	uint8_t childNumber;
-	assert(parent);
+	if (parent == NULL)
+		return NULL;
+	assert(key.depth / 2 < key.length);
 	childNumber = (uint8_t) key.str[key.depth / 2];
 	if (key.depth % 2 == 0)
 		childNumber /= SQRT_256;

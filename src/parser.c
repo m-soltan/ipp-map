@@ -6,10 +6,6 @@
 #define COMMENT_SYMBOL '#'
 #define INIT_BUFFER_SIZE 2
 
-// TODO: remove
-#undef stdin
-#define stdin debugInput
-
 typedef struct Addition Addition;
 typedef struct Creation Creation;
 typedef struct Extension Extension;
@@ -115,10 +111,8 @@ static Repair *getRepair(char *str);
 
 static Map *globalMap = NULL;
 static size_t lineNumber = 0;
-static FILE *debugInput;
 
 bool setMap() {
-	debugInput = fopen("test.in", "r");
 	assert(globalMap == NULL);
 	globalMap = newMap();
 	return globalMap != NULL;

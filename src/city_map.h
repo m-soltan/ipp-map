@@ -1,17 +1,16 @@
 #ifndef MAP_CITY_MAP_H
 #define MAP_CITY_MAP_H
+
 #include <stdbool.h>
 #include "global_declarations.h"
 
-bool cityMakeSpace(City *city);
-
 bool cityMapIsLast(const CityMap *cityMap, City *const *city);
-City **cityMapAdd(CityMap *cityMap);
-CityMap *cityMapInit(void);
 size_t cityMapGetLength(const CityMap *cityMap);
 void cityMapDestroy(CityMap **pCityMap);
-void cityMapRemove(CityMap *cityMap);
-
-bool roadAdjust(City *from, City *to, unsigned length);
+void cityMapTrim(CityMap *cityMap, size_t length);
+City *cityMapAddCity(CityInfo info, City *(*fun)(CityInfo, size_t));
+City *cityMapGetAt(CityMap *cityMap, size_t index);
+City *const *cityMapSuffix(CityMap *cityMap, size_t start);
+CityMap *cityMapInit(void);
 
 #endif //MAP_CITY_MAP_H

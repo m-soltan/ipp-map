@@ -90,8 +90,8 @@ void queueDestroy(Heap **pHeap) {
 
 // auxiliary function definitions
 bool queueAdjust(Heap *heap) {
-	assert(heap && heap->sizeMax > heap->size);
-	if (heap->size < heap->sizeMax)
+	assert(heap && (heap->sizeMax > heap->size));
+	if (heap->sizeMax > heap->size + 1)
 		return true;
 	Node *tmp = realloc(heap->v, 2 * heap->sizeMax * sizeof(Node));
 	if (tmp) {

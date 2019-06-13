@@ -59,6 +59,8 @@ bool addRoad(Map *map, const char *city1, const char *city2,
  */
 bool repairRoad(Map *map, const char *city1, const char *city2, int repairYear);
 
+bool routeFromList(Map *map, unsigned id, const char **names, unsigned *rLengths, int *years, size_t length);
+
 /** @brief Łączy dwa różne miasta drogą krajową.
  * Tworzy drogę krajową pomiędzy dwoma miastami i nadaje jej podany numer.
  * Wśród istniejących odcinków dróg wyszukuje najkrótszą drogę. Jeśli jest
@@ -117,6 +119,9 @@ bool extendRoute(Map *map, unsigned routeId, const char *city);
  */
 bool removeRoad(Map *map, const char *city1, const char *city2);
 
+
+bool removeRoute(Map *map, unsigned routeId);
+
 /** @brief Udostępnia informacje o drodze krajowej.
  * Zwraca wskaźnik na napis, który zawiera informacje o drodze krajowej. Alokuje
  * pamięć na ten napis. Zwraca pusty napis, jeśli nie istnieje droga krajowa
@@ -134,7 +139,24 @@ bool removeRoad(Map *map, const char *city1, const char *city2);
  */
 const char * getRouteDescription(Map *map, unsigned routeId);
 
-// TODO: separation
+
+/** @brief Udostępnia informacje o drodze krajowej.
+ * Argumenty i wynik takie same jak w funkcji getRouteDescription,
+ * z tą różnicą, że zwrócony napis można modyfikować.
+ *
+ * @param [in,out] map – wskaźnik na strukturę przechowującą mapę dróg;
+ * @param [in] routeId – numer drogi krajowej.
+ * @return Wskaźnik na napis lub NULL, gdy nie udało się zaalokować pamięci.
+ */
+char *routeDescriptionAux(Map *map, unsigned routeId);
+
+/** @brief usuwa wskazywaną strukturę Trunk (przechowującą opis drogi krajowej)
+ *
+ * @param trunks tablica trzymająca informacje o wszystkich drogach krajowych w
+ * danej mapie
+ * @param trunkId numer struktury do usunięcia (taki sam, jak jej numer drogi
+ * krajowej)
+ */
 void destroyTrunk(Trunk *trunks[ROUTE_LIMIT], unsigned trunkId);
 
 #endif /* MAP_MAP_H */

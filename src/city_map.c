@@ -10,6 +10,8 @@
 #include "trie.h"
 #include "trunk.h"
 
+#define INIT_SPACE 8
+
 typedef struct Detour Detour;
 
 struct CityMap {
@@ -17,15 +19,19 @@ struct CityMap {
 	City **cities;
 };
 
+static bool adjust(CityMap *cityMap);
 static bool empty(const CityMap *cityMap);
 static void destroyLast(CityMap *cityMap);
 
-// linked function definitions
 CityMap *cityMapInit() {
 	CityMap *ans = malloc(sizeof(CityMap));
+	size_t lengthMax = INIT_SPACE;
 	if (ans) {
-		*ans = (CityMap) {.length = 0, .lengthMax = 8};
-		ans->cities = malloc(ans->lengthMax * sizeof(City *));
+		*ans = (CityMap) {
+			.length = 0,
+			.lengthMax = lengthMax,
+			.cities = calloc(lengthMax, sizeof(City *))
+		};
 		if (ans->cities)
 			return ans;
 		free(ans);
@@ -48,31 +54,18 @@ void cityMapDestroy(CityMap **pCityMap) {
 	*pCityMap = NULL;
 }
 
-bool roadAdjust(City *from, City *to, unsigned length) {
-	Road *road = roadFind(from, to);
-	return roadReserve(road, length);
-}
-
-City **cityMapAdd(CityMap *cityMap) {
-	City **ans, **temp;
-	size_t size;
-	if (cityMap->length == cityMap->lengthMax) {
-		assert(cityMap->lengthMax);
-		size = 2 * cityMap->lengthMax;
-		temp = realloc(cityMap->cities, size * sizeof(City *));
-		if (temp == NULL)
-			return NULL;
-		cityMap->cities = temp;
-		cityMap->lengthMax *= 2;
+City *cityMapAddCity(CityInfo info, City *(*fun)(CityInfo, size_t)) {
+	bool success = adjust(info.cityMap);
+	if (success) {
+		size_t position = info.cityMap->length;
+		City **pCity = &info.cityMap->cities[position];
+		*pCity = fun(info, position);
+		if (*pCity) {
+			++info.cityMap->length;
+			return *pCity;
+		}
 	}
-	ans = &cityMap->cities[cityMap->length];
-	++cityMap->length;
-	return ans;
-
-}
-
-void cityMapRemove(CityMap *cityMap) {
-	--cityMap->length;
+	return NULL;
 }
 
 bool cityMapIsLast(const CityMap *cityMap, City *const *city) {
@@ -80,18 +73,47 @@ bool cityMapIsLast(const CityMap *cityMap, City *const *city) {
 	return *city == *last;
 }
 
-// auxiliary function definitions
+City *const *cityMapSuffix(CityMap *cityMap, size_t start) {
+	return &cityMap->cities[start];
+}
+
+void cityMapTrim(CityMap *cityMap, size_t length) {
+	if (cityMap->length < length)
+		assert(false);
+	while (length < cityMap->length) {
+		destroyLast(cityMap);
+	}
+}
+
+City *cityMapGetAt(CityMap *cityMap, size_t index) {
+	return cityMap->cities[index];
+}
+
 static void destroyLast(CityMap *cityMap) {
+	(void) empty; // used only by assertions
 	assert(!empty(cityMap));
 	City **last = &cityMap->cities[cityMap->length - 1];
 	for (size_t i = cityGetRoadCount(*last); i > 0; --i) {
 		assert(i == cityGetRoadCount(*last));
 		cityDetachLast(*last);
 	}
-	cityDestroy(last, cityMap);
+	cityDestroy(last);
 	--cityMap->length;
 }
 
-bool empty(const CityMap *cityMap) {
+static bool empty(const CityMap *cityMap) {
 	return cityMap->length == 0;
+}
+
+static bool adjust(CityMap *cityMap) {
+	if (cityMap->length < cityMap->lengthMax)
+		return true;
+	size_t newMax = 2 * cityMap->lengthMax;
+	City **temp = realloc(cityMap->cities, newMax * sizeof(City *));
+	if (temp) {
+		cityMap->lengthMax = newMax;
+		cityMap->cities = temp;
+		return true;
+	}
+	return false;
 }

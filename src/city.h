@@ -6,19 +6,26 @@
 
 #include "global_declarations.h"
 
+struct CityInfo {
+	const char *name;
+	CityMap *cityMap;
+};
+
+Road *roadFind(City *city1, City *city2);
+
 bool cityConnectRoad(City *city, Road *road);
 bool cityMakeRoad(City *city1, City *city2, Road *road);
-Road *roadFind(City *city1, City *city2);
-City *cityInit(CityMap *cityMap, const char *name, Road *road);
-
-Road **cityPath(City *from, City *to, CityMap *cityMap, size_t *length);
-size_t cityGetName(char *dest, const City *city);
+const char *cityGetName(const City *city);
+size_t cityCopyName(char *dest, const City *city);
 size_t cityGetNameLength(const City *city);
 size_t cityGetRoadCount(const City *city);
 void cityBlock(City *city);
-void cityDestroy(City **city, CityMap *cityMap);
+void cityDestroy(City **pCity);
 void cityDetach(City *city, const Road *road);
 void cityDetachLast(City *city);
 void cityUnblock(City *city);
+City *cityAdd(CityMap *cityMap, const char *name, Road *road);
+City *cityDecoy();
+Road **cityPath(City *from, City *to, CityMap *cityMap, size_t *length);
 
 #endif //MAP_CITY_H

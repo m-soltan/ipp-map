@@ -7,6 +7,7 @@
 #define SQRT_256 16
 
 typedef struct Key Key;
+typedef struct TrieStore TrieStore;
 
 struct Key {
 	const char *str;
@@ -18,92 +19,169 @@ struct Trie {
 	Trie *children[SQRT_256];
 };
 
-Trie **build(Trie ** trie, City **city, Key key, bool *success);
-Trie **getChild(Trie *parent, Key key);
+struct TrieStore {
+	size_t length;
+	Trie **arr;
+};
 
+static bool hasNext(Key key);
+static bool storePrepare(size_t count);
+static void add(Trie *trie, const char *str, City *city);
+static void build(Trie **trie, Key key, City *city);
+static void storeDrop();
+static City *getVal(Trie *trie);
+static Key makeKey(const char *str);
+static Trie *find(Trie *trie, Key key);
+static Trie *storeTake();
 
-// linked function definitions
-Trie **trieInsert(Trie *trie, const char *str, City **city, bool *success) {
-	Trie **child = NULL;
-	if (trieFind(trie, str)) {
-		*success = false;
-		return NULL;
+static Trie **getChild(Trie *parent, Key key);
+
+static TrieStore trieStore = (TrieStore) {.length = 0, .arr = NULL};
+
+bool trieInsert(Trie *trie, const char *str, City *city) {
+	bool success;
+	size_t length = strlen(str);
+	success = storePrepare(2 * length);
+	if (success) {
+		add(trie, str, city);
+		storeDrop();
+		return true;
 	}
-	Key key = (Key) {.str = str, .length = strlen(str)};
-	for (key.depth = 0; str[key.depth / 2]; ++key.depth) {
-		child = getChild(trie, key);
-		if (*child) {
-			trie = *child;
-		} else {
-			return build(&trie, city, key, success);
-		}
-	}
-	assert(child && !trie->val);
-	trie->val = *city;
-	*success = true;
-	return child;
+	return false;
 }
 
-City *trieFind(Trie *x, const char *str) {
-	Key key = (Key) {.str = str, .length = strlen(str)};
-	Trie *child = x;
-	for (; str[key.depth / 2]; ++key.depth) {
-		child = *getChild(x, key);
-		if (child)
-			x = child;
-		else
-			return NULL;
-	}
-	return child->val;
+City *trieFind(Trie *trie, const char *str) {
+	return getVal(find(trie, makeKey(str)));
 }
 
 Trie *trieInit() {
-	Trie *ans = malloc(sizeof(Trie));
-	if (ans) {
-		ans->val = NULL;
-		memset(ans->children, 0, SQRT_256 * sizeof(Trie *));
+	bool success = storePrepare(1);
+	if (success) {
+		Trie *ans = storeTake();
+		storeDrop();
+		return ans;
+	} else {
+		return NULL;
 	}
-	return ans;
 }
 
-void trieDestroy(Trie **x) {
-	Trie *t = *x;
+void trieDestroy(Trie **pTrie) {
+	Trie *t = *pTrie;
 	if (!t)
 		return;
 	for (size_t i = 0; i < SQRT_256; ++i)
 		trieDestroy(&t->children[i]);
 	free(t);
-	*x = NULL;
+	*pTrie = NULL;
 }
 
-
-Trie **build(Trie **const trie, City **city, Key key, bool *success) {
-	Trie **ans = getChild(*trie, key), **current = trie;
-	for (const size_t n = key.length * 2; key.depth < n; ++key.depth) {
-		current = getChild(*current, key);
-		*current = trieInit();
-		if (!*current) {
-			trieDestroy(getChild(*trie, key));
-			free(*city);
-			*success = false;
-			return NULL;
-		}
+bool trieAddFromList(Trie *trie, NameList list, City *const *cities) {
+	bool success;
+	size_t totalLength = 0;
+	for (size_t i = 0; i < list.length; ++i)
+		totalLength += strlen(list.v[i]);
+	success = storePrepare(2 * totalLength);
+	if(success) {
+		for (size_t i = 0; i < list.length; ++i)
+			add(trie, list.v[i], cities[i]);
+		storeDrop();
+		return true;
 	}
-	(*current)->val = *city;
-	*success = true;
-	return ans;
+	return false;
 }
 
-Trie **getChild(Trie *parent, Key key) {
+static Trie **getChild(Trie *parent, Key key) {
 	Trie **ans;
 	uint8_t childNumber;
-	if (parent == NULL)
-		return NULL;
+	assert(parent);
 	assert(key.depth / 2 < key.length);
 	childNumber = (uint8_t) key.str[key.depth / 2];
 	if (key.depth % 2 == 0)
 		childNumber /= SQRT_256;
 	childNumber %= SQRT_256;
-	ans = parent->children + childNumber;
+	ans = &parent->children[childNumber];
 	return ans;
+}
+
+static Trie *find(Trie *trie, Key key) {
+	Trie *child = trie;
+	for (; hasNext(key); ++key.depth) {
+		child = *getChild(trie, key);
+		if (child)
+			trie = child;
+		else
+			return NULL;
+	}
+	return child;
+}
+
+static Key makeKey(const char *str) {
+	return (Key) {
+		.str = str,
+		.depth = 0,
+		.length = strlen(str),
+	};
+}
+
+static bool hasNext(Key key) {
+	return key.str[key.depth / 2] != '\0';
+}
+
+static Trie *storeTake() {
+	assert(0 < trieStore.length);
+	Trie *ans = trieStore.arr[trieStore.length - 1];
+	--trieStore.length;
+	return ans;
+}
+
+static bool storePrepare(size_t count) {
+	assert(trieStore.length == 0);
+	trieStore.arr = calloc(count, sizeof(Trie *));
+	if (trieStore.arr) {
+		for (; trieStore.length < count; ++trieStore.length) {
+			trieStore.arr[trieStore.length] = calloc(1, sizeof(Trie));
+			if (trieStore.arr[trieStore.length] == NULL)
+				break;
+		}
+		if (trieStore.length == count)
+			return true;
+		storeDrop();
+	}
+	return false;
+}
+
+static void storeDrop() {
+	for (size_t i = 0; i < trieStore.length; ++i) {
+		free(trieStore.arr[i]);
+	}
+	free(trieStore.arr);
+	trieStore = (TrieStore) {.arr = NULL, .length = 0};
+}
+
+static void add(Trie *trie, const char *str, City *city) {
+	Key key = makeKey(str);
+	Trie **child = NULL, **parent = &trie;
+	for (; hasNext(key); ++key.depth) {
+		child = getChild(*parent, key);
+		if (*child)
+			parent = child;
+		else
+			return build(parent, key, city);
+	}
+}
+
+void build(Trie **trie, Key key, City *city) {
+	Trie **current = trie;
+	for (const size_t n = key.length * 2; key.depth < n; ++key.depth) {
+		current = getChild(*current, key);
+		*current = storeTake();
+	}
+	(*current)->val = city;
+}
+
+City *getVal(Trie *trie) {
+	if (trie)
+		return trie->val;
+	else
+		return NULL;
 }

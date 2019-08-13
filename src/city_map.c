@@ -45,13 +45,13 @@ size_t cityMapGetLength(const CityMap *cityMap) {
 
 void cityMapDestroy(CityMap **pCityMap) {
 	CityMap *temp = *pCityMap;
-	for (size_t i = temp->length; i > 0; --i) {
-		assert(i == temp->length);
-		destroyLast(*pCityMap);
-	}
-	free((*pCityMap)->cities);
-	free(*pCityMap);
 	*pCityMap = NULL;
+	for (size_t i = temp->length; i > 0; --i) {
+		assert(temp->length == i);
+		destroyLast(temp);
+	}
+	free(temp->cities);
+	free(temp);
 }
 
 City *cityMapAddCity(CityInfo info, City *(*fun)(CityInfo, size_t)) {

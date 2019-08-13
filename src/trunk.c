@@ -141,8 +141,8 @@ Trunk *trunkExtend(CityMap *cityMap, Trunk *trunk, City *city) {
 }
 
 void trunkFree(Trunk **pTrunk) {
-	assert(*pTrunk != NULL);
 	Trunk *trunk = *pTrunk;
+	assert(trunk != NULL);
 	*pTrunk = NULL;
 	free(trunk->roads);
 	free(trunk);

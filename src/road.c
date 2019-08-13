@@ -128,6 +128,7 @@ void roadTrunkRemove(Road *road, unsigned trunkId) {
 	for (unsigned i = 0; i < road->routeCount; ++i) {
 		if (road->routes[i] == trunkId) {
 			road->routes[i] = *last;
+			--road->routeCount;
 			return;
 		}
 	}
@@ -195,8 +196,9 @@ bool roadUpdate(Road *road, int year) {
 }
 
 void roadDestroyTrunks(Trunk *trunks[ROUTE_LIMIT], Road *road) {
-	for (size_t i = 0; i < road->routeCount; ++i)
-		destroyTrunk(trunks, road->routes[i]);
+	for (size_t i = 0; i < road->routeCount; ++i) {
+		trunkFree(&trunks[road->routes[i]]);
+	}
 }
 
 int roadWrite(char *str, const Road *road, const City *city) {
@@ -208,6 +210,7 @@ int roadWrite(char *str, const Road *road, const City *city) {
 }
 
 void roadTrunkAdd(Road *r, unsigned trunkId) {
+	assert(r->routeCount < ROUTE_LIMIT);
 	r->routes[r->routeCount] = trunkId;
 	++r->routeCount;
 }
@@ -231,10 +234,6 @@ void roadDetach(Road *road, const City *city) {
 		assert(road->city2 == city);
 		cityDetach(road->city2, road);
 		road->city2 = NULL;
-	}
-	if (road->city1 == NULL && road->city2 == NULL) {
-		free(road->routes);
-		free(road);
 	}
 }
 
@@ -297,6 +296,22 @@ size_t roadMapGetLength(const RoadMap *roadMap) {
 	return roadMap->length;
 }
 
+void roadMapDestroy(RoadMap **pRoadMap) {
+	RoadMap *temp = *pRoadMap;
+	for (size_t i = 0; i < temp->length; ++i) {
+		Road *road = temp->roads[i];
+		temp->roads[i] = NULL;
+		if (road->routes != NULL) {
+			free(road->routes);
+			road->routes = NULL;
+		}
+		free(road);
+	}
+	free(temp->roads);
+	free(*pRoadMap);
+	*pRoadMap = NULL;
+}
+
 void roadMapTrim(RoadMap *roadMap, size_t length) {
 	if (roadMap->length < length)
 		assert(false);
@@ -307,6 +322,33 @@ void roadMapTrim(RoadMap *roadMap, size_t length) {
 
 Road *const *roadMapGetSuffix(RoadMap *roadMap, size_t start) {
 	return &roadMap->roads[start];
+}
+
+bool roadMapCheck(const RoadMap *roadMap) {
+	size_t lastSeen[ROUTE_LIMIT];
+	for (size_t i = 0; i < ROUTE_LIMIT; ++i)
+		lastSeen[i] = SIZE_MAX;
+	for (size_t i = 0; i < roadMap->length; ++i) {
+		Road *road = roadMap->roads[i];
+		for (size_t j = 0; j < road->routeCount; ++j) {
+			if (lastSeen[road->routes[j]] == i)
+				return false;
+			else
+				lastSeen[road->routes[j]] = i;
+		}
+	}
+	return true;
+}
+
+bool roadMapTrunkCheck(const RoadMap *roadMap, const bool trunks[ROUTE_LIMIT]) {
+	for (size_t i = 0; i < roadMap->length; ++i) {
+		Road *road = roadMap->roads[i];
+		for (size_t j = 0; j < road->routeCount; ++j) {
+			if (trunks[road->routes[j]] == false)
+				return false;
+		}
+	}
+	return true;
 }
 
 static bool initTrunks(Road *road, unsigned length) {
@@ -360,7 +402,11 @@ static Road *roadInit(RoadMap *roadMap) {
 static void removeLast(RoadMap *roadMap) {
 	Road **pLast = &roadMap->roads[roadMap->length - 1];
 	Road *last = *pLast;
-	assert(last->routes == NULL);
+	assert(roadRouteCount(last) == 0);
+	if (last->routes != NULL) {
+		free(last->routes);
+		last->routes = NULL;
+	}
 	free(last);
 	*pLast = NULL;
 	--roadMap->length;

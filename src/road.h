@@ -31,10 +31,12 @@ void roadGetCities(Road *road, City **city1, City **city2);
 void roadTrunkAdd(Road *r, unsigned trunkId);
 void roadTrunkRemove(Road *road, unsigned trunkId);
 void roadUnblock(Road *road, unsigned length);
-
 City *roadIntersect(Road *road1, Road *road2);
 
+bool roadMapCheck(const RoadMap *roadMap);
+bool roadMapTrunkCheck(const RoadMap *roadMap, const bool trunks[ROUTE_LIMIT]);
 size_t roadMapGetLength(const RoadMap *roadMap);
+void roadMapDestroy(RoadMap **pRoadMap);
 void roadMapTrim(RoadMap *roadMap, size_t length);
 Road *const *roadMapGetSuffix(RoadMap *roadMap, size_t start);
 RoadMap *roadMapInit(void);

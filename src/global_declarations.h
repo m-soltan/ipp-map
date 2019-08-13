@@ -1,9 +1,6 @@
 #ifndef MAP_GLOBAL_DECLARATIONS_H
 #define MAP_GLOBAL_DECLARATIONS_H
 
-// todo: remove
-// 5
-
 #define ROUTE_LIMIT 1000
 
 #include <assert.h>

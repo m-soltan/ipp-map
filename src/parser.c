@@ -87,7 +87,7 @@ static const char *acceptFirst(Word *word);
 static const char *acceptNext(Word *word);
 static const char *acceptPrefix(const char *str, const char *prefix);
 static char *nextWord(void);
-static int push(Creation *c, char *cityName, long roadLength, long year);
+static int push(Creation *c, const char *cityName, long roadLength, long year);
 static long nextLongInt(void);
 static size_t isCityName(const char *str);
 static size_t isLongInt(const char *str);
@@ -423,7 +423,7 @@ static Creation *getCreation(char *str) {
 	return NULL;
 }
 
-static int push(Creation *c, char *cityName, long roadLength, long year) {
+static int push(Creation *c, const char *cityName, long roadLength, long year) {
 	bool lengthSuccess, yearSuccess;
 	if (!resize(c))
 		return OUT_OF_MEMORY;

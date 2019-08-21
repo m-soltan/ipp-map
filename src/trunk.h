@@ -5,14 +5,13 @@
 #include "global_declarations.h"
 
 bool trunkHasCity(const Trunk *trunk, const City *city);
+bool trunkTest(const Trunk *trunk);
 char *trunkDescription(const Trunk *trunk);
 size_t trunkGetLength(const Trunk *trunk);
 unsigned trunkGetId(Trunk *trunk);
 void trunkAttach(Trunk *trunk);
 void trunkDestroy(Trunk **pTrunk);
-void trunkBlock(Trunk *trunk);
 void trunkFree(Trunk **pTrunk);
-void trunkUnblock(Trunk *trunk);
 Trunk *trunkAddDetour(CityMap *cityMap, Trunk *trunk, Road *road);
 Trunk *trunkBuild(City *from, City *to, CityMap *m, unsigned trunkId);
 Trunk *trunkExtend(CityMap *cityMap, Trunk *trunk, City *c);

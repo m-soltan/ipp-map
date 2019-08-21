@@ -24,13 +24,14 @@ struct City {
 struct QPosition {
 	City *city;
 	int minYear;
-	char pad[sizeof(size_t) - sizeof(int)];
+	int pad[1];
 	size_t distance;
 };
 
 struct Record {
 	bool *repeated;
 	size_t *d;
+	int *years;
 	Road **roads;
 };
 
@@ -38,9 +39,9 @@ static bool initFields(City *city, CityInfo info, size_t id);
 static bool isUnique(Heap *queue, City *to, int minYear, size_t d1, bool repeated);
 static bool makeSpace(City *city);
 static bool writePath(Heap *queue, QPosition *position, City *from, City *to, Record *record);
-static size_t pathLength(const Record *record, City *from, City *to);
+static size_t pathLength(const Record *record, City *from, City *finish);
 static void addRoad(City *city, Road *road);
-static void markVisited(Record *record, size_t cityId, size_t distance);
+static void markVisited(Record *record, size_t cityId, size_t distance, int year);
 static void recordFree(Record **pRecord);
 static void visit(Heap *queue, QPosition position, Record *record);
 static City *add(CityInfo info);
@@ -98,10 +99,11 @@ Road **cityPath(City *from, City *to, CityMap *cityMap, size_t *length) {
 			return NULL;
 		}
 		bool repeated = record->repeated[to->id];
-		if (isUnique(queue, to, position.minYear, position.distance, repeated))
+		if (isUnique(queue, to, position.minYear, position.distance, repeated)) {
 			ans = makeList(from, to, record, length);
-		else
+		} else {
 			*length = SIZE_MAX;
+		}
 		queueDestroy(&queue);
 	}
 	recordFree(&record);
@@ -157,14 +159,15 @@ void cityDestroy(City **pCity) {
 }
 
 Road *roadFind(City *city1, City *city2) {
-	assert(city1 && city2);
-	if (city1 == city2)
-		return NULL;
-	if (city1->roadCount > city2->roadCount)
-		return roadFind(city2, city1);
-	for (size_t i = 0; i < city1->roadCount; ++i) {
-		if (roadHasCity(city1->roads[i], city2))
-			return city1->roads[i];
+	if (city1 && city2) {
+		if (city1 == city2)
+			return NULL;
+		if (city1->roadCount > city2->roadCount)
+			return roadFind(city2, city1);
+		for (size_t i = 0; i < city1->roadCount; ++i) {
+			if (roadHasCity(city1->roads[i], city2))
+				return city1->roads[i];
+		}
 	}
 	return NULL;
 }
@@ -218,11 +221,15 @@ static Record *recordMake(const CityMap *cityMap) {
 		ans->repeated = calloc(size, sizeof(bool));
 		if (ans->repeated) {
 			ans->d = calloc(size, sizeof(size_t));
+			ans->years = calloc(size, sizeof(size_t));
+//			todo
+			assert(ans->years);
 			if (ans->d) {
 				ans->roads = malloc(size * sizeof(Road *));
 				if (ans->roads)
 					return ans;
 				free(ans->d);
+				free(ans->years);
 			}
 			free(ans->repeated);
 		}
@@ -236,6 +243,7 @@ static void recordFree(Record **pRecord) {
 	free(record->d);
 	free(record->repeated);
 	free(record->roads);
+	free(record->years);
 	free(record);
 	*pRecord = NULL;
 }
@@ -243,7 +251,7 @@ static void recordFree(Record **pRecord) {
 static void visit(Heap *queue, QPosition position, Record *record) {
 	City *const current = position.city;
 	assert(!current->blocked);
-	markVisited(record, current->id, position.distance);
+	markVisited(record, current->id, position.distance, position.minYear);
 	for (size_t i = 0; i < current->roadCount; ++i) {
 		Road *r = current->roads[i];
 		City *city1, *city2, *nextCity;
@@ -261,19 +269,23 @@ static void visit(Heap *queue, QPosition position, Record *record) {
 	}
 }
 
-size_t pathLength(const Record *record, City *from, City *to) {
-	City *city1, *city2, *current, *prev;
-	size_t ans = 0;
-	for (current = to, prev = NULL; prev != from; current = prev) {
+size_t pathLength(const Record *record, City *start, City *finish) {
+	City *city1, *city2, *current = finish, *nextCity = NULL;
+	for (size_t ans = 1; true; ++ans) {
+		assert(current != start);
 		roadGetCities(record->roads[current->id], &city1, &city2);
-		assert(city1 == current || city2 == current);
-		if (city1 == current)
-			prev = city2;
-		else
-			prev = city1;
-		++ans;
+		if (city1 == current) {
+			nextCity = city2;
+		} else if (city2 == current) {
+			nextCity = city1;
+		} else {
+			assert(false);
+			return 0;
+		}
+		if (nextCity == start)
+			return ans;
+		current = nextCity;
 	}
-	return ans;
 }
 
 bool isUnique(Heap *queue, City *to, int minYear, size_t d1, bool repeated) {
@@ -336,12 +348,17 @@ static bool initFields(City *city, CityInfo info, size_t id) {
 	return false;
 }
 
-static void markVisited(Record *record, size_t cityId, size_t distance) {
-	size_t *d = record->d;
-	if (d[cityId] == 0)
-		d[cityId] = distance;
-	else if (d[cityId] == distance)
+/* sets the current id as visited, checks if it has already been visited before
+ * with the same distance and min. year
+ * if yes, records a repetition
+ */
+static void markVisited(Record *record, size_t cityId, size_t distance, int year) {
+	if (record->d[cityId] == 0) {
+		record->d[cityId] = distance;
+		record->years[cityId] = year;
+	} else if (record->d[cityId] == distance && record->years[cityId] == year) {
 		record->repeated[cityId] = true;
+	}
 }
 
 static bool makeSpace(City *city) {

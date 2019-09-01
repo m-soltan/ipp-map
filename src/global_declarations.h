@@ -34,6 +34,6 @@ struct RoadInfo {
 	RoadMap *roadMap;
 };
 
-void bp();
+void bp(void);
 
 #endif //MAP_GLOBAL_DECLARATIONS_H

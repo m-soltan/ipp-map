@@ -74,6 +74,7 @@ bool cityMapIsLast(const CityMap *cityMap, City *const *city) {
 }
 
 City *const *cityMapSuffix(CityMap *cityMap, size_t start) {
+	assert(start < cityMapGetLength(cityMap));
 	return &cityMap->cities[start];
 }
 
@@ -87,6 +88,16 @@ void cityMapTrim(CityMap *cityMap, size_t length) {
 
 City *cityMapGetAt(CityMap *cityMap, size_t index) {
 	return cityMap->cities[index];
+}
+
+bool cityMapTest(const CityMap *cityMap, Trie *trie) {
+	for (size_t i = 0; i < cityMap->length; ++i) {
+		City *city = cityMap->cities[i];
+		assert(city);
+		if (trieFind(trie, cityGetName(city)) != city)
+			return false;
+	}
+	return true;
 }
 
 static void destroyLast(CityMap *cityMap) {

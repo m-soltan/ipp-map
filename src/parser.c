@@ -6,17 +6,17 @@
 #define COMMENT_SYMBOL '#'
 #define INIT_BUFFER_SIZE 2
 
-typedef struct Addition Addition;
+typedef struct AddRoad AddRoad;
 typedef struct Creation Creation;
 typedef struct Extension Extension;
 typedef struct Description Description;
-typedef struct New New;
+typedef struct NewRoute NewRoute;
 typedef struct RemRoad RemRoad;
 typedef struct RemRoute RemRoute;
 typedef struct Repair Repair;
 typedef struct Word Word;
 
-struct Addition {
+struct AddRoad {
 	char *city1;
 	char *city2;
 	int builtYear;
@@ -43,7 +43,7 @@ struct Extension {
 	char *city;
 };
 
-struct New {
+struct NewRoute {
 	unsigned routeId;
 	unsigned pad;
 	char *city1, *city2;
@@ -77,7 +77,7 @@ static bool isComment(const char *str);
 static bool isCreation(const char *str);
 static bool isDescription(const char *str);
 static bool isExtension(const char *str);
-static bool isNew(const char *str);
+static bool isNewRoute(const char *str);
 static bool isRemRoad(const char *str);
 static bool isRemRoute(const char *str);
 static bool isRepair(const char *str);
@@ -91,26 +91,31 @@ static int push(Creation *c, const char *cityName, long roadLength, long year);
 static long nextLongInt(void);
 static size_t isCityName(const char *str);
 static size_t isLongInt(const char *str);
-static void doAddition(Addition *ptr);
+static void creationDestroy(Creation **pCreation);
+static void doAddition(AddRoad *ptr);
 static void doCreation(Creation *ptr);
-static void doExtension(Extension *ptr);
 static void doDescription(Description *ptr);
-static void doNew(New *ptr);
+static void doExtension(Extension *ptr);
+static void doNewRoute(NewRoute *ptr);
 static void doRemRoad(RemRoad *ptr);
 static void doRemRoute(RemRoute *ptr);
 static void doRepair(Repair *ptr);
-static void creationDestroy(Creation **pCreation);
-static Addition *getAddition(char *str);
+static AddRoad *getAddition(char *str);
 static Creation *getCreation(char *str);
 static Description *getDescription(char *str);
 static Extension *getExtension(char *str);
-static New *getNew(char *str);
+static NewRoute *getNewRoute(char *str);
 static RemRoad *getRemRoad(char *str);
 static RemRoute *getRemRoute(char *str);
 static Repair *getRepair(char *str);
 
 static Map *globalMap = NULL;
 static size_t lineNumber = 0;
+
+//todo: remove
+void bp() {
+
+}
 
 bool setMap() {
 	assert(globalMap == NULL);
@@ -129,7 +134,8 @@ char *getLine(void) {
 	++lineNumber;
 	while (true) {
 		int c = fgetc(stdin);
-		if (c == '\n' || c == EOF)
+		assert(c != EOF);
+		if (c == '\n')
 			return buffer;
 		if (i == bufferSize - 1) {
 			bufferSize *= 2;
@@ -155,7 +161,7 @@ void parserRead(char *line) {
 		doCreation(getCreation(line));
 	// comment
 	else if (isComment(line))
-		return;
+		;
 	// getRouteDescription
 	else if (isDescription(line))
 		doDescription(getDescription(line));
@@ -163,8 +169,8 @@ void parserRead(char *line) {
 	else if (isExtension(line))
 		doExtension(getExtension(line));
 	// newRoute
-	else if (isNew(line))
-		doNew(getNew(line));
+	else if (isNewRoute(line))
+		doNewRoute(getNewRoute(line));
 	// removeRoad
 	else if (isRemRoad(line))
 		doRemRoad(getRemRoad(line));
@@ -184,23 +190,29 @@ void parserExamples() {
 	assert(isComment("#"));
 	assert(isDescription("getRouteDescription;10"));
 	assert(isExtension("extendRoute;10;a"));
-	assert(isNew("newRoute;10;a;b"));
+	assert(isNewRoute("newRoute;10;a;b"));
 	assert(isRemRoad("removeRoad;a;b"));
 	assert(isRemRoute("removeRoute;10"));
 	assert(isRepair("repairRoad;a;b;-1"));
 }
 
 int runParser(void) {
-	bool success;
-	success = setMap();
-	if (!success)
+	// todo: remove
+//#undef stdin
+//	stdin = fopen("./t.in", "r");
+
+	bool success_init;
+	success_init = setMap();
+	if (!success_init)
 		return OUT_OF_MEMORY;
 	while (true) {
 		int c = fgetc(stdin);
-		if (c == EOF)
+		if (c == EOF) {
+			deleteMap(globalMap);
 			return 0;
-		else
+		} else {
 			ungetc(c, stdin);
+		}
 		char *line = getLine();
 		if (line == NULL) {
 			deleteMap(globalMap);
@@ -227,15 +239,16 @@ static bool isComment(const char *str) {
 static bool isCreation(const char *str) {
 	str = acceptFirst(&(Word) {.str = str, .fun = isLongInt});
 	for (size_t i = 0; true; ++i) {
+		char c;
 		str = acceptNext(&(Word) {.str = str, .fun = isCityName});
 		if (str == NULL)
 			return false;
-		if (str[0] != ';')
-			break;
+		c = str[0];
+		if (c != ';')
+			return c == '\0' && i > 0;
 		for (int j = 0; j < 2; ++j)
 			str = acceptNext(&(Word) {.str = str, .fun = isLongInt});
 	}
-	return str[0] == '\0';
 }
 
 static bool isRepair(const char *str) {
@@ -252,7 +265,7 @@ static bool isDescription(const char *str) {
 	return str && str[0] == '\0';
 }
 
-static void doAddition(Addition *ptr) {
+static void doAddition(AddRoad *ptr) {
 	assert(globalMap != NULL);
 	if (ptr) {
 		bool success = addRoad(
@@ -270,15 +283,15 @@ static void doAddition(Addition *ptr) {
 	writeError();
 }
 
-static Addition *getAddition(char *str) {
-	Addition *ans = malloc(sizeof(Addition));
+static AddRoad *getAddition(char *str) {
+	AddRoad *ans = malloc(sizeof(AddRoad));
 	if (ans) {
 		strtok(str, ";");
 		char *city1 = nextWord();
 		char *city2 = nextWord();
-		long builtYear = nextLongInt();
 		long length = nextLongInt();
-		*ans = (Addition) {
+		long builtYear = nextLongInt();
+		*ans = (AddRoad) {
 				.builtYear = (int) builtYear,
 				.length = (unsigned) length};
 		if (length == ans->length && builtYear == ans->builtYear) {
@@ -327,11 +340,11 @@ static bool charIsLetter(char c) {
 
 static size_t isLongInt(const char *str) {
 	if (str[0] == '0')
-		return false;
+		return str[1] == '\0';
 	for (size_t i = 0; true; ++i) {
 		if (str[i] == ';' || str[i] == '\0')
 			return i;
-		if (i == 0 && str[i] == '-')
+		if (i == 0 && str[i] == '-' && str[i + 1] != '\0')
 			continue;
 		if (!isdigit(str[i]))
 			return 0;
@@ -364,6 +377,7 @@ static void doRepair(Repair *ptr) {
 				ptr->city1,
 				ptr->city2,
 				ptr->repairYear);
+		free(ptr);
 		if (success)
 			return;
 	}
@@ -398,10 +412,10 @@ static void doDescription(Description *ptr) {
 }
 
 static Creation *getCreation(char *str) {
-	Creation *ans = malloc(sizeof(Creation));
+	Creation *ans = calloc(1, sizeof(Creation));
 	if (ans) {
 		long routeId = strtol(strtok(str, ";"), NULL, 10);
-		*ans = (Creation) {.routeId = (unsigned) routeId};
+		ans->routeId = (unsigned) routeId;
 		if (ans->routeId == routeId) {
 			for (bool stay = true; stay;) {
 				int pushResult;
@@ -411,10 +425,8 @@ static Creation *getCreation(char *str) {
 				if (roadLength == 0 || builtYear == 0)
 					stay = false;
 				pushResult = push(ans, cityName, roadLength, builtYear);
-				if (pushResult != 0) {
-					creationDestroy(&ans);
+				if (pushResult != 0)
 					return NULL;
-				}
 			}
 			return ans;
 		}
@@ -432,8 +444,10 @@ static int push(Creation *c, const char *cityName, long roadLength, long year) {
 	c->builtYears[c->length] = (int) year;
 	lengthSuccess = c->roadLengths[c->length] == roadLength;
 	yearSuccess = c->builtYears[c->length] == year;
-	if (!lengthSuccess || !yearSuccess)
+	if (!lengthSuccess || !yearSuccess) {
+		creationDestroy(&c);
 		return INVALID_ARG;
+	}
 	++c->length;
 	return 0;
 }
@@ -441,12 +455,15 @@ static int push(Creation *c, const char *cityName, long roadLength, long year) {
 static void creationDestroy(Creation **pCreation) {
 	Creation *creation = *pCreation;
 	*pCreation = NULL;
-	if (creation->length > 0) {
-		free(creation->cityNames);
-		free(creation->builtYears);
-		free(creation->roadLengths);
-		free(creation);
-	}
+	void *arr[] = {
+			creation->cityNames,
+			creation->builtYears,
+			creation->roadLengths
+	};
+	for (size_t i = 0; i < sizeof(arr) / sizeof(arr[0]); ++i)
+		if (arr[i])
+			free(arr[i]);
+	free(creation);
 }
 
 static bool resize(Creation *c) {
@@ -489,11 +506,9 @@ static void doCreation(Creation *ptr) {
 				ptr->cityNames,
 				ptr->roadLengths,
 				ptr->builtYears,
-				ptr->length);
-		free(ptr->cityNames);
-		free(ptr->builtYears);
-		free(ptr->roadLengths);
-		free(ptr);
+				ptr->length
+		);
+		creationDestroy(&ptr);
 		if (success) {
 			return;
 		}
@@ -529,7 +544,7 @@ static bool isExtension(const char *str) {
 	return str && str[0] == '\0';
 }
 
-static bool isNew(const char *str) {
+static bool isNewRoute(const char *str) {
 	str = acceptPrefix(str, "newRoute");
 	str = acceptNext(&(Word) {.str = str, .fun = isLongInt});
 	str = acceptNext(&(Word) {.str = str, .fun = isCityName});
@@ -562,24 +577,25 @@ static Extension *getExtension(char *str) {
 		*ans = (Extension) {.routeId = (unsigned) routeId, .city = city};
 		if ((long) ans->routeId == routeId)
 			return ans;
+		free(ans);
 	}
 	return NULL;
 }
 
-static New *getNew(char *str) {
-	New *ans = malloc(sizeof(New));
+static NewRoute *getNewRoute(char *str) {
+	NewRoute *ans = calloc(1, sizeof(NewRoute));
 	if (ans) {
-		char *city1;
-		char *city2;
+		long routeId;
 		strtok(str, ";");
-		city1 = nextWord();
-		city2 = nextWord();
-		*ans = (New) {
-			.city1 = city1,
-			.city2 = city2
-		};
-		assert(city1 && city2);
-		return ans;
+		routeId = nextLongInt();
+		ans->routeId = (unsigned) routeId;
+		ans->city1 = nextWord();
+		ans->city2 = nextWord();
+		assert(ans->city1 && ans->city2);
+		if (ans->routeId == routeId)
+			return ans;
+		else
+			free(ans);
 	}
 	return NULL;
 }
@@ -587,16 +603,18 @@ static New *getNew(char *str) {
 static void doExtension(Extension *ptr) {
 	if (ptr) {
 		bool success = extendRoute(globalMap, ptr->routeId, ptr->city);
+		free(ptr);
 		if (success)
 			return;
 	}
 	writeError();
 }
 
-void doNew(New *ptr) {
+void doNewRoute(NewRoute *ptr) {
 	if (ptr) {
 		bool success;
 		success = newRoute(globalMap, ptr->routeId, ptr->city1, ptr->city2);
+		free(ptr);
 		if (success)
 			return;
 	}
@@ -622,6 +640,7 @@ void doRemRoad(RemRoad *ptr) {
 	if (ptr) {
 		bool success;
 		success = removeRoad(globalMap, ptr->city1, ptr->city2);
+		free(ptr);
 		if (success)
 			return;
 	}
@@ -632,6 +651,7 @@ void doRemRoute(RemRoute *ptr) {
 	if (ptr) {
 		bool success;
 		success = removeRoute(globalMap, ptr->routeId);
+		free(ptr);
 		if (success)
 			return;
 	}

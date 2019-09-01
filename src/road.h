@@ -19,7 +19,7 @@ bool roadMoveTrunks(CityMap *cityMap, Trunk *trunks[ROUTE_LIMIT], Road *road);
 bool roadReserve(Road *road);
 bool roadUpdate(Road *road, int year);
 int roadGetYear(const Road *road);
-int roadWrite(char *str, const Road *road, const City *city);
+long roadWrite(char *str, const Road *road, const City *city);
 unsigned roadBlock(Road *road);
 unsigned roadRouteCount(const Road *road);
 unsigned roadGetLength(const Road *road);

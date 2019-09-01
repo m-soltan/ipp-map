@@ -11,7 +11,7 @@ struct CityInfo {
 	CityMap *cityMap;
 };
 
-Road *roadFind(City *city1, City *city2);
+Road *cityFindRoad(City *city1, City *city2);
 
 bool cityConnectRoad(City *city, Road *road);
 bool cityMakeRoad(City *city1, City *city2, Road *road);
@@ -25,7 +25,7 @@ void cityDetach(City *city, const Road *road);
 void cityDetachLast(City *city);
 void cityUnblock(City *city);
 City *cityAdd(CityMap *cityMap, const char *name, Road *road);
-City *cityDecoy();
+City *cityDecoy(void);
 Road **cityPath(City *from, City *to, CityMap *cityMap, size_t *length);
 
 #endif //MAP_CITY_H

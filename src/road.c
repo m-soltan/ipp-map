@@ -10,6 +10,7 @@ struct Road {
 	City *city1, *city2;
 	int year;
 	unsigned length, routeCount;
+	unsigned pad;
 	bool *routes;
 };
 
@@ -20,10 +21,13 @@ struct RoadMap {
 
 static bool add(RoadMap *roadMap, Road *road);
 static bool adjust(RoadMap *roadMap);
-static bool checkDestroyed(const Road *road, Trunk *trunks[ROUTE_LIMIT]);
 static bool testCount(const Road *road);
 static void removeLast(RoadMap *roadMap);
 static Road *roadInit(RoadMap *roadMap);
+
+#ifndef NDEBUG
+static bool checkDestroyed(const Road *road, Trunk *trunks[ROUTE_LIMIT]);
+#endif // NDEBUG
 
 bool roadReserve(Road *road) {
 	if (road->routes == NULL) {
@@ -112,7 +116,7 @@ void roadTrunkRemove(Road *road, unsigned trunkId) {
 
 void roadFree(Road **pRoad) {
 	Road *road = *pRoad;
-	assert(!roadFind(road->city1, road->city2));
+	assert(!cityFindRoad(road->city1, road->city2));
 	*pRoad = NULL;
 	free(road->routes);
 	free(road);
@@ -143,7 +147,7 @@ bool roadExtend(CityMap *m, Trie *t, City *city, RoadInfo info) {
 }
 
 bool roadLink(RoadMap *roadMap, City *city1, City *city2, unsigned length, int year) {
-	if (roadFind(city1, city2) != NULL)
+	if (cityFindRoad(city1, city2) != NULL)
 		return false;
 	Road *r = roadInit(roadMap);
 	if (r) {
@@ -180,8 +184,8 @@ void roadDestroyTrunks(Trunk *trunks[ROUTE_LIMIT], Road *road) {
 	road->routes = NULL;
 }
 
-int roadWrite(char *str, const Road *road, const City *city) {
-	int ans;
+long roadWrite(char *str, const Road *road, const City *city) {
+	long ans;
 	ans = sprintf(str, ";%u;%i;", road->length, road->year);
 	ans += cityCopyName(str + ans, city);
 	assert(ans > 0);
@@ -331,7 +335,7 @@ bool roadMapTestCount(const RoadMap *roadMap) {
 }
 
 void roadGetIds(const Road *road, unsigned *result) {
-	for (size_t i = 0, j = 0; i < ROUTE_LIMIT; ++i) {
+	for (unsigned i = 0, j = 0; i < ROUTE_LIMIT; ++i) {
 		assert(i < ROUTE_LIMIT);
 		if (roadHasRoute(road, i)) {
 			result[j] = i;
@@ -399,16 +403,19 @@ static void removeLast(RoadMap *roadMap) {
 	--roadMap->length;
 }
 
+// function used only in assertions
+#ifndef NDEBUG
 bool checkDestroyed(const Road *road, Trunk *trunks[ROUTE_LIMIT]) {
-	for (size_t i = 0; i < ROUTE_LIMIT; ++i) {
+	for (unsigned i = 0; i < ROUTE_LIMIT; ++i) {
 		if (roadHasRoute(road, i) && trunks[i])
 			return false;
 	}
 	return true;
 }
+#endif // NDEBUG
 
 static bool testCount(const Road *road) {
-	for (size_t i = 1, count = 0; true; ++i) {
+	for (unsigned i = 1, count = 0; true; ++i) {
 		if (count == roadRouteCount(road))
 			return true;
 		if (i == ROUTE_LIMIT)

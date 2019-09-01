@@ -15,6 +15,6 @@ void trunkFree(Trunk **pTrunk);
 Trunk *trunkAddDetour(CityMap *cityMap, Trunk *trunk, Road *road);
 Trunk *trunkBuild(City *from, City *to, CityMap *m, unsigned trunkId);
 Trunk *trunkExtend(CityMap *cityMap, Trunk *trunk, City *c);
-Trunk *trunkMake(unsigned id, City *first, City *last, Road *const *roads, size_t roadCount);
+Trunk *trunkMake(Trie *trie, unsigned id, NameList list);
 
 #endif //MAP_TRUNK_H

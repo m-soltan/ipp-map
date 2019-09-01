@@ -20,15 +20,17 @@ static bool invalidId(unsigned routeId);
 static bool namesAreCorrect(const char *city1, const char *city2);
 static bool nameError(const char *str);
 static bool testExistingRoads(Map *map, const char **names, const unsigned *roadLengths, size_t length);
-static bool testInvariants(Map *map);
 static bool testNameUniqueness(const char **names, size_t length);
 static bool testRoute(Map *map, const char **names, const int *years, const unsigned *roadLengths, size_t length);
 static bool testYears(Map *map, const char **names, const int *years, size_t length);
-static bool *whichTrunks(const Map *map);
 static void destroyTrunks(Map *map);
-
 static void repairFromList(Map *map, NameList list, const int *years);
 static Road *find(Trie *trie, const char *city1, const char *city2);
+
+#ifndef NDEBUG
+static bool testInvariants(Map *map);
+static bool *whichTrunks(const Map *map);
+#endif // NDEBUG
 
 Map *newMap(void) {
 	Map *ans = calloc(1, sizeof(Map));
@@ -91,23 +93,21 @@ bool addRoad(Map *map, const char *city1, const char *city2, unsigned length, in
 		if (!c1 && !c2)
 			ans = cityMapLoneRoad(map->cities, map->trie, info);
 	}
-	assert(testInvariants(map));
-	if (ans && c1)
+	if (ans && c1) {
+		(void) count1;
 		assert(cityGetRoadCount(c1) == count1 + 1);
-	if (ans && c2)
+	}
+	if (ans && c2) {
+		(void) count2;
 		assert(cityGetRoadCount(c2) == count2 + 1);
+	}
 	return ans;
 }
 
 bool repairRoad(Map *map, const char *city1, const char *city2, int repairYear) {
 	bool ans;
-	City *c1, *c2;
 	Road *r;
-	c1 = trieFind(map->trie, city1);
-	c2 = trieFind(map->trie, city2);
-	if (!c1 || !c2)
-		return false;
-	r = roadFind(c1, c2);
+	r = find(map->trie, city1, city2);
 	if (r == NULL)
 		return false;
 	ans = roadUpdate(r, repairYear);
@@ -124,13 +124,16 @@ bool newRoute(Map *map, unsigned routeId, const char *city1, const char *city2) 
 		return false;
 	if (c1 && c2 && map->routes[routeId] == NULL) {
 		route = trunkBuild(c1, c2, map->cities, routeId);
-		if (route && trunkGetLength(route) < SIZE_MAX) {
-			assert(routeId < ROUTE_LIMIT);
-			map->routes[routeId] = route;
-			trunkAttach(route);
-			assert(trunkTest(route));
-			assert(testInvariants(map));
-			return true;
+		if (route) {
+			if (trunkGetLength(route) < SIZE_MAX) {
+				assert(routeId < ROUTE_LIMIT);
+				map->routes[routeId] = route;
+				trunkAttach(route);
+				assert(trunkTest(route));
+				assert(testInvariants(map));
+				return true;
+			}
+			trunkFree(&route);
 		}
 	}
 	return false;
@@ -159,22 +162,20 @@ bool extendRoute(Map *map, unsigned routeId, const char *city) {
 bool removeRoad(Map *map, const char *city1, const char *city2) {
 	assert(testInvariants(map));
 	bool ans;
-	City *c1 = trieFind(map->trie, city1), *c2 = trieFind(map->trie, city2);
-	Road *r = roadFind(c1, c2);
+	Road *r = find(map->trie, city1, city2);
 	if (r == NULL)
 		return false;
 	ans = destroyRoad(map, r);
 	assert(!map->routes[410] || trunkTest(map->routes[410]));
 	if (ans)
-		assert(roadFind(c1, c2) == NULL);
+		assert(find(map->trie, city1, city2) == NULL);
 	assert(testInvariants(map));
 	return ans;
 }
 
 char *routeDescriptionAux(Map *map, unsigned routeId) {
-	char *ans = malloc(sizeof(char));
+	char *ans = calloc(1, sizeof(char));
 	if (ans) {
-		*ans = '\0';
 		if (!invalidId(routeId)) {
 			Trunk *route = map->routes[routeId];
 			if (route != NULL) {
@@ -211,33 +212,39 @@ void destroyTrunk(Trunk *trunks[ROUTE_LIMIT], unsigned trunkId) {
 	trunkDestroy(&trunks[trunkId]);
 }
 
-bool routeFromList(Map *map, unsigned id, const char **names, unsigned *rLengths, int *years, size_t length) {
+bool routeFromList(
+		Map *map,
+		unsigned id,
+		const char **names,
+		const unsigned *rLengths,
+		const int *years,
+		size_t length
+) {
 	if (!testRoute(map, names, years, rLengths, length))
+		return false;
+	if (invalidId(id) || map->routes[id])
 		return false;
 	const size_t cityCount = cityMapGetLength(map->cities);
 	const size_t roadCount = roadMapGetLength(map->roads);
 	NameList list = (NameList) {.length = length, .v  = names};
 	bool addSuccess = addFromList(map, list, years, rLengths);
 	if (addSuccess) {
-		City *first, *last;
-		first = trieFind(map->trie, names[0]);
-		if (first == NULL) {
-			first = cityMapGetAt(map->cities, roadCount);
-		}
-		last = trieFind(map->trie, names[length - 1]);
-		if (last == NULL) {
-			last = cityMapGetAt(map->cities, cityMapGetLength(map->cities) - 1);
-		}
-		size_t trunkLength = roadMapGetLength(map->roads) - roadCount;
-		Road *const *roads = roadMapGetSuffix(map->roads, roadCount);
-		Trunk *trunk = trunkMake(id, first, last, roads, trunkLength);
+		Trunk *trunk = trunkMake(map->trie, id, list);
 		if (trunk) {
 			bool insertSuccess;
-			City *const *suffix = cityMapSuffix(map->cities, cityCount);
-			insertSuccess = trieAddFromList(map->trie, list, suffix);
+			if (cityCount == cityMapGetLength(map->cities)) {
+				insertSuccess = true;
+			} else {
+				assert(cityCount < cityMapGetLength(map->cities));
+				City *const *suffix = cityMapSuffix(map->cities, cityCount);
+				insertSuccess = trieAddFromList(map->trie, list, suffix);
+			}
 			if (insertSuccess) {
+				assert(!invalidId(id));
 				map->routes[id] = trunk;
 				repairFromList(map, list, years);
+				trunkAttach(trunk);
+				assert(trunkTest(trunk));
 				return true;
 			}
 			trunkFree(&trunk);
@@ -270,13 +277,8 @@ static bool destroyRoad(Map *map, Road *road) {
 		if (!moveSuccess)
 			return false;
 	}
-//	todo: remove
-//	roadDisconnect(road);
-	Trunk *trunk = map->routes[410];
 	roadDetach(road, city1);
-	assert(!trunk || trunkTest(trunk));
 	roadDetach(road, city2);
-	assert(!trunk || trunkTest(trunk));
 	return true;
 }
 
@@ -314,33 +316,35 @@ static bool invalidId(unsigned routeId) {
 }
 
 static bool testNameUniqueness(const char **names, size_t length) {
-	size_t i = 0;
+	bool ans = false;
 	Trie *seen = trieInit();
-	City *blank = cityDecoy();
 	if (seen) {
-		for (; i < length; ++i) {
-			bool insertSuccess;
-			if (trieFind(seen, names[i]))
-				break;
-			insertSuccess = trieInsert(seen, names[i], blank);
-			if (!insertSuccess)
-				break;
+		City *blank = cityDecoy();
+		if (blank) {
+			size_t i = 0;
+			for (; i < length; ++i) {
+				bool insertSuccess;
+				if (trieFind(seen, names[i]))
+					break;
+				insertSuccess = trieInsert(seen, names[i], blank);
+				if (!insertSuccess)
+					break;
+			}
+			if (i == length)
+				ans = true;
+			cityDestroy(&blank);
 		}
 		trieDestroy(&seen);
 	}
-	return i == length;
+	return ans;
 }
 
 static bool testExistingRoads(Map *map, const char **names, const unsigned *roadLengths, size_t length) {
 	for (size_t i = 1; i < length; ++i) {
-		City *city1, *city2;
-		city1 = trieFind(map->trie, names[i - 1]);
-		city2 = trieFind(map->trie, names[i]);
-		if (city1 && city2) {
-			Road *road = roadFind(city1, city2);
-			if (road && (roadGetLength(road) != roadLengths[i - 1]))
-				return false;
-		}
+		const char *city1 = names[i - 1], *city2 = names[i];
+		Road *road = find(map->trie, city1, city2);
+		if (road && (roadGetLength(road) != roadLengths[i - 1]))
+			return false;
 	}
 	return true;
 }
@@ -352,7 +356,7 @@ static bool testYears(Map *map, const char **names, const int *years, size_t len
 		city2 = trieFind(map->trie, names[i]);
 		if (city1 == NULL || city2 == NULL)
 			continue;
-		Road *road = roadFind(city1, city2);
+		Road *road = cityFindRoad(city1, city2);
 		if (road && roadGetYear(road) > years[i - 1])
 			return false;
 	}
@@ -367,16 +371,33 @@ static bool testRoute(Map *map, const char **names, const int *years, const unsi
 	return ans;
 }
 
+//todo: out of memory handling
 static bool addFromList(Map *map, NameList list, const int *years, const unsigned *roadLengths) {
-	for (size_t i = 0; i < list.length - 1; ++i) {
-		const char *city1, *city2;
-		city1 = list.v[i];
-		city2 = list.v[i + 1];
+	for (size_t i = 1; i < list.length; ++i) {
+		const char *city1 = list.v[i - 1];
+		const char *city2 = list.v[i];
 		Road *road = find(map->trie, city1, city2);
 		if (road == NULL) {
-			bool success = addRoad(map, city1, city2, roadLengths[i], years[i]);
-			if (!success)
+			bool addSuccess = addRoad(
+					map,
+					city1,
+					city2,
+					roadLengths[i - 1],
+					years[i - 1]
+			);
+			if (!addSuccess) {
+				// todo
+				assert(false);
 				return false;
+			}
+			road = find(map->trie, city1, city2);
+		}
+		assert(road);
+		bool reserveSuccess = roadReserve(road);
+		if (!reserveSuccess) {
+			// todo
+			assert(false);
+			return false;
 		}
 	}
 	return true;
@@ -387,7 +408,7 @@ static Road *find(Trie *trie, const char *city1, const char *city2) {
 	c1 = trieFind(trie, city1);
 	c2 = trieFind(trie, city2);
 	if (c1 && c2)
-		return roadFind(c1, c2);
+		return cityFindRoad(c1, c2);
 	else
 		return NULL;
 }
@@ -403,12 +424,22 @@ static void repairFromList(Map *map, NameList list, const int *years) {
 	for (size_t i = 1; i < list.length; ++i) {
 		const char *city1 = list.v[i - 1];
 		const char *city2 = list.v[i];
-		repairRoad(map, city1, city2, years[i]);
+		bool success;
+		assert(trieFind(map->trie, city1));
+		assert(trieFind(map->trie, city2));
+		Road *road = find(map->trie, city1, city2);
+		assert(road);
+		success = roadUpdate(road, years[i - 1]);
+		(void) success;
+		assert(success);
 	}
 }
 
+// debug function used only in assertions
+#ifndef NDEBUG
 static bool testInvariants(Map *map) {
 	if (!roadMapTestCount(map->roads)) {
+		bp();
 		return false;
 	}
 	{
@@ -416,19 +447,27 @@ static bool testInvariants(Map *map) {
 		success = roadMapTestTrunk(map->roads, trunks);
 		free(trunks);
 		if (!success) {
+			bp();
 			return false;
 		}
 	}
+	if (cityMapTest(map->cities, map->trie) == false)
+		return false;
 	{
 		for (size_t i = 0; i < ROUTE_LIMIT; ++i) {
 			if (map->routes[i])
-				if (!trunkTest(map->routes[i]))
+				if (!trunkTest(map->routes[i])) {
+					bp();
 					return false;
+				}
 		}
 	}
 	return true;
 }
+#endif // NDEBUG
 
+// debug function used only in assertions
+#ifndef NDEBUG
 static bool *whichTrunks(const Map *map) {
 	bool *ans = calloc(ROUTE_LIMIT, sizeof(bool));
 	assert(ans);
@@ -436,3 +475,4 @@ static bool *whichTrunks(const Map *map) {
 		ans[i] = (map->routes[i] != NULL);
 	return ans;
 }
+#endif // NDEBUG

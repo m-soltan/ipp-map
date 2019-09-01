@@ -59,7 +59,14 @@ bool addRoad(Map *map, const char *city1, const char *city2,
  */
 bool repairRoad(Map *map, const char *city1, const char *city2, int repairYear);
 
-bool routeFromList(Map *map, unsigned id, const char **names, unsigned *rLengths, int *years, size_t length);
+bool routeFromList(
+		Map *map,
+		unsigned id,
+		const char **names,
+		const unsigned *rLengths,
+		const int *years,
+		size_t length
+);
 
 /** @brief Łączy dwa różne miasta drogą krajową.
  * Tworzy drogę krajową pomiędzy dwoma miastami i nadaje jej podany numer.

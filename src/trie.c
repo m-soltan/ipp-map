@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "city.h"
 #include "trie.h"
 
 #define SQRT_256 16
@@ -28,11 +29,11 @@ static bool hasNext(Key key);
 static bool storePrepare(size_t count);
 static void add(Trie *trie, const char *str, City *city);
 static void build(Trie **trie, Key key, City *city);
-static void storeDrop();
+static void storeDrop(void);
 static City *getVal(Trie *trie);
 static Key makeKey(const char *str);
 static Trie *find(Trie *trie, Key key);
-static Trie *storeTake();
+static Trie *storeTake(void);
 
 static Trie **getChild(Trie *parent, Key key);
 
@@ -45,6 +46,7 @@ bool trieInsert(Trie *trie, const char *str, City *city) {
 	if (success) {
 		add(trie, str, city);
 		storeDrop();
+		assert(trieFind(trie, str));
 		return true;
 	}
 	return false;
@@ -82,8 +84,13 @@ bool trieAddFromList(Trie *trie, NameList list, City *const *cities) {
 		totalLength += strlen(list.v[i]);
 	success = storePrepare(2 * totalLength);
 	if(success) {
-		for (size_t i = 0; i < list.length; ++i)
-			add(trie, list.v[i], cities[i]);
+		for (size_t i = 0, j = 0; i < list.length; ++i) {
+			const char *name = list.v[i];
+			if (trieFind(trie, name) == NULL) {
+				add(trie, name, cities[j]);
+				++j;
+			}
+		}
 		storeDrop();
 		return true;
 	}
@@ -159,15 +166,18 @@ static void storeDrop() {
 }
 
 static void add(Trie *trie, const char *str, City *city) {
-	Key key = makeKey(str);
+	assert(str[0]);
 	Trie **child = NULL, **parent = &trie;
-	for (; hasNext(key); ++key.depth) {
+	for (Key key = makeKey(str); hasNext(key); ++key.depth) {
 		child = getChild(*parent, key);
-		if (*child)
+		if (*child) {
 			parent = child;
-		else
-			return build(parent, key, city);
+		} else {
+			build(parent, key, city);
+			return;
+		}
 	}
+	(*parent)->val = city;
 }
 
 void build(Trie **trie, Key key, City *city) {

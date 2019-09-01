@@ -24,7 +24,7 @@ struct City {
 struct QPosition {
 	City *city;
 	int minYear;
-	int pad[1];
+	int pad;
 	size_t distance;
 };
 
@@ -39,7 +39,7 @@ static bool initFields(City *city, CityInfo info, size_t id);
 static bool isUnique(Heap *queue, City *to, int minYear, size_t d1, bool repeated);
 static bool makeSpace(City *city);
 static bool writePath(Heap *queue, QPosition *position, City *from, City *to, Record *record);
-static size_t pathLength(const Record *record, City *from, City *finish);
+static size_t pathLength(const Record *record, City *start, City *finish);
 static void addRoad(City *city, Road *road);
 static void markVisited(Record *record, size_t cityId, size_t distance, int year);
 static void recordFree(Record **pRecord);
@@ -158,13 +158,14 @@ void cityDestroy(City **pCity) {
 	*pCity = NULL;
 }
 
-Road *roadFind(City *city1, City *city2) {
+Road *cityFindRoad(City *city1, City *city2) {
 	if (city1 && city2) {
 		if (city1 == city2)
 			return NULL;
 		if (city1->roadCount > city2->roadCount)
-			return roadFind(city2, city1);
-		for (size_t i = 0; i < city1->roadCount; ++i) {
+			return cityFindRoad(city2, city1);
+		const size_t count = cityGetRoadCount(city1);
+		for (size_t i = 0; i < count; ++i) {
 			if (roadHasCity(city1->roads[i], city2))
 				return city1->roads[i];
 		}
@@ -222,13 +223,13 @@ static Record *recordMake(const CityMap *cityMap) {
 		if (ans->repeated) {
 			ans->d = calloc(size, sizeof(size_t));
 			ans->years = calloc(size, sizeof(size_t));
-//			todo
-			assert(ans->years);
-			if (ans->d) {
-				ans->roads = malloc(size * sizeof(Road *));
-				if (ans->roads)
-					return ans;
-				free(ans->d);
+			if (ans->years) {
+				if (ans->d) {
+					ans->roads = calloc(size, sizeof(Road *));
+					if (ans->roads)
+						return ans;
+					free(ans->d);
+				}
 				free(ans->years);
 			}
 			free(ans->repeated);
@@ -263,7 +264,7 @@ static void visit(Heap *queue, QPosition position, Record *record) {
 				minYear = position.minYear;
 			if (record->d[nextCity->id])
 				continue;
-			unsigned distance = position.distance + roadGetLength(r);
+			size_t distance = position.distance + roadGetLength(r);
 			queuePush(queue, r, nextCity, distance, minYear);
 		}
 	}

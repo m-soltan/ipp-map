@@ -5,6 +5,7 @@
 #include "global_declarations.h"
 
 bool cityMapIsLast(const CityMap *cityMap, City *const *city);
+bool cityMapTest(const CityMap *cityMap, Trie *trie);
 size_t cityMapGetLength(const CityMap *cityMap);
 void cityMapDestroy(CityMap **pCityMap);
 void cityMapTrim(CityMap *cityMap, size_t length);

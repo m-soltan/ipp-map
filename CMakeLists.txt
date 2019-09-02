@@ -20,8 +20,8 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_C_FLAGS "-std=c11 -Wall -Wextra")
 # Domyślne opcje dla wariantów Release i Debug są sensowne.
 # Jeśli to konieczne, ustawiamy tu inne.
-# set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
-# set(CMAKE_C_FLAGS_DEBUG "-g")
+ set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
+ set(CMAKE_C_FLAGS_DEBUG "-g")
 
 # Wskazujemy pliki źródłowe.
 set(SOURCE_FILES
@@ -42,7 +42,8 @@ set(SOURCE_FILES
     src/city.h
     src/parser.c
     src/parser.h
-    src/map_main.c)
+    src/map_main.c
+)
 
 # Wskazujemy plik wykonywalny.
 add_executable(map ${SOURCE_FILES})
@@ -55,7 +56,7 @@ if (DOXYGEN_FOUND)
     # Dodajemy cel doc: użycie make doc spowoduje wywołanie doxygena z odpowiednim plikiem konfiguracyjnym w folderze kompilacji.
     # Na wyjście zostanie wypisany odpowiedni komentarz.
     add_custom_target(doc
-        ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+        doxygen ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMENT "Generating API documentation with Doxygen"
     )

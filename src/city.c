@@ -11,16 +11,33 @@
 #define INIT_ROAD_MAX 16
 
 typedef struct QPosition QPosition;
+/** The result of a search in the road map.
+ * Used to check for paths that could become Routes, detours or
+ * extensions.
+ */
 typedef struct Record Record;
 
+/// Stores information about a single city in the road map
 struct City {
+	/// a blocked city cannot be visited by a graph search
 	bool blocked;
+	/// explicit struct padding
 	bool pad[7];
+	/// name of the city
 	char *name;
-	size_t id, nameSize, roadCount, roadMax;
+	/// an id number of the city
+	size_t id;
+	/// size of the name string
+	size_t nameSize;
+	/// number of adjacent roads
+	size_t roadCount;
+	/// total number of records available for adjacent roads
+	size_t roadMax;
+	/// roads connected to the city
 	Road **roads;
 };
 
+//! @cond
 struct QPosition {
 	City *city;
 	int minYear;
@@ -49,6 +66,7 @@ static City *init(CityInfo info, size_t id);
 static QPosition pop(Heap *queue, Road **road);
 static Road **makeList(City *from, City *to, Record *record, size_t *length);
 static Record *recordMake(const CityMap *cityMap);
+//! @endcond
 
 bool cityConnectRoad(City *city, Road *road) {
 	if (!makeSpace(city))
@@ -193,6 +211,7 @@ City *cityDecoy() {
 	return ans;
 }
 
+//! @cond
 static Road **makeList(City *from, City *to, Record *record, size_t *length) {
 	*length = pathLength(record, from, to);
 	Road **buffer = malloc(*length * sizeof(Road *));
@@ -396,3 +415,4 @@ static City *add(CityInfo info) {
 	}
 	return NULL;
 }
+//! @endcond

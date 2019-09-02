@@ -14,10 +14,13 @@
 
 typedef struct Detour Detour;
 
+//! @cond
 struct CityMap {
-	size_t length, lengthMax;
+	size_t length;
+	size_t lengthMax;
 	City **cities;
 };
+//! @endcond
 
 static bool adjust(CityMap *cityMap);
 static bool empty(const CityMap *cityMap);
@@ -68,11 +71,6 @@ City *cityMapAddCity(CityInfo info, City *(*fun)(CityInfo, size_t)) {
 	return NULL;
 }
 
-bool cityMapIsLast(const CityMap *cityMap, City *const *city) {
-	City **last = &cityMap->cities[cityMap->length - 1];
-	return *city == *last;
-}
-
 City *const *cityMapSuffix(CityMap *cityMap, size_t start) {
 	assert(start < cityMapGetLength(cityMap));
 	return &cityMap->cities[start];
@@ -84,10 +82,6 @@ void cityMapTrim(CityMap *cityMap, size_t length) {
 	while (length < cityMap->length) {
 		destroyLast(cityMap);
 	}
-}
-
-City *cityMapGetAt(CityMap *cityMap, size_t index) {
-	return cityMap->cities[index];
 }
 
 bool cityMapTest(const CityMap *cityMap, Trie *trie) {

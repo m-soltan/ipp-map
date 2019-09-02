@@ -2,21 +2,35 @@
 #include <stdlib.h>
 #include "queue.h"
 
+/// A node of the priority queue
 typedef struct Node Node;
 
+
+/** A priority queue implementation.
+ * Uses a heap to implement the priority queue. Needed for graph search
+ * operations.
+ */
 struct Heap {
+	/// list of nodes
 	Node *v;
-	size_t size, sizeMax;
+	/// current size of the heap
+	size_t size;
+	/// total number of records available to the heap
+	size_t sizeMax;
 };
-
-
+//! @cond
 struct Node {
+	/// last city reached
 	City *city;
+	/// last road used on the path to that node
 	Road *last;
+	/// minimum year on the path represented by the node
 	int minYear;
-	char pad[sizeof(size_t) - sizeof(int)];
+	int pad;
+	/// the weight of the node
 	size_t s;
 };
+//! @endcond
 
 // auxiliary function declarations
 bool queueAdjust(Heap *heap);

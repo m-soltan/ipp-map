@@ -6,17 +6,37 @@
 
 #define ROAD_MAP_LENGTH 32
 
+/// Stores information about a road
 struct Road {
-	City *city1, *city2;
+	/// a city connected to the road
+	City *city1;
+	/// a city connected to the road
+	City *city2;
+	/// the year of last repair or construction
 	int year;
-	unsigned length, routeCount;
+	/// the length of the road
+	unsigned length;
+	/// number of Routes using the road
+	unsigned routeCount;
+	/// explicit struct padding
 	unsigned pad;
+	/** integer -> bool map, informing whether a Route with a given id uses the
+	 * road. Initialized with NULL (equivalent of empty map) to save space.
+	 */
 	bool *routes;
 };
 
+/** Contains all roads from a map structure.
+ * Allows to hide information about roads from code that doesn't
+ * need to use it.
+ */
 struct RoadMap {
+	/// all roads of the map
 	Road **roads;
-	size_t length, maxLength;
+	/// number of existing roads
+	size_t length;
+	/// number of records available for storing roads
+	size_t maxLength;
 };
 
 static bool add(RoadMap *roadMap, Road *road);
@@ -45,7 +65,7 @@ unsigned roadRouteCount(const Road *road) {
 	return road->routeCount;
 }
 
-bool cityMapLoneRoad(CityMap *cityMap, Trie *trie, RoadInfo roadInfo) {
+bool roadLoneRoad(CityMap *cityMap, Trie *trie, RoadInfo roadInfo) {
 	const char *names[2];
 	City *cities[2];
 	names[0] = roadInfo.city1;
@@ -255,11 +275,6 @@ bool roadMoveTrunks(CityMap *cityMap, Trunk *trunks[ROUTE_LIMIT], Road *road) {
 	return true;
 }
 
-void roadDisconnect(Road *road) {
-	roadDetach(road, road->city1);
-	roadDetach(road, road->city2);
-}
-
 RoadMap *roadMapInit(void) {
 	RoadMap *ans = malloc(sizeof(RoadMap));
 	if (ans) {
@@ -301,10 +316,6 @@ void roadMapTrim(RoadMap *roadMap, size_t length) {
 	const size_t n = roadMap->length - length;
 	for (size_t i = 0; i < n; ++i)
 		removeLast(roadMap);
-}
-
-Road *const *roadMapGetSuffix(RoadMap *roadMap, size_t start) {
-	return &roadMap->roads[start];
 }
 
 bool roadMapTestTrunk(const RoadMap *roadMap, const bool *trunks) {

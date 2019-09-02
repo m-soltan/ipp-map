@@ -2,7 +2,6 @@
 #include "parser.h"
 
 int main(void) {
-	parserExamples();
 	int ans;
 	ans = runParser();
 	if (ans == OUT_OF_MEMORY)

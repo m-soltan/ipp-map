@@ -12,11 +12,21 @@
 
 #define ROUTE_NUMBER_MAX_LENGTH 3
 
+/** A structure used to store information about paths on the road map.
+ * Mostly used by Routes.
+ */
 struct Trunk {
+	/// id of a Route using this trunk
 	unsigned id;
+	/// explicit struct padding
 	unsigned pad;
+	/// number of roads making up the trunk, SIZE_MAX if decoy
 	size_t length;
-	City *first,*last;
+	/// the city where the trunk begins
+	City *first;
+	/// the city in which the trunk ends
+	City *last;
+	/// roads making up the trunk, ordered
 	Road **roads;
 };
 
@@ -167,15 +177,12 @@ bool trunkTest(const Trunk *trunk) {
 	Road **const roads = trunk->roads;
 	for (size_t i = 1; i < trunk->length; ++i) {
 		if (!roadHasRoute(roads[i], trunk->id)) {
-			bp();
 			return false;
 		}
 		if (roads[i - 1] == roads[i]) {
-			bp();
 			return false;
 		}
 		if (!roadHasIntersection(roads[i - 1], roads[i])) {
-			bp();
 			return false;
 		}
 	}

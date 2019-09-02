@@ -16,61 +16,109 @@ typedef struct RemRoute RemRoute;
 typedef struct Repair Repair;
 typedef struct Word Word;
 
+/// a struct storing information about the addRoad parser command
 struct AddRoad {
+	/// a city the road is connected to
 	char *city1;
+	/// a city the road is connected to
 	char *city2;
+	/// the year the road was built
 	int builtYear;
+	/// the length of the road to be added
 	unsigned length;
 };
 
+/** @brief A struct storing information about a parser command.
+ * Describes the command that creates a route from path description.
+ */
 struct Creation {
+	/// id of the route to be created
 	unsigned routeId;
+	/// explicit struct padding
 	unsigned pad;
+	/// list of the names of the cities the route will use
 	const char **cityNames;
+	/// list of the lengths of the roads used by the route
 	unsigned *roadLengths;
+	/// list of the years the roads were last repaired or built
 	int *builtYears;
-	size_t length, lengthMax;
+	/// current length of the lists
+	size_t length;
+	/// total space available to each list
+	size_t lengthMax;
 
 };
 
+/// A struct storing information about the getRouteDescription parser command.
 struct Description {
+	/// id of the examined route
 	unsigned routeId;
 };
 
+/// A struct storing information about the extendRoute parser command.
 struct Extension {
+	/// id of the route to be extended
 	unsigned routeId;
+	/// explicit struct padding
 	unsigned pad;
+	/// the city the extension will end in
 	char *city;
 };
 
+/// A struct storing information about the newRoute parser command.
 struct NewRoute {
+	/// the id of the route to be added
 	unsigned routeId;
+	/// explicit struct padding
 	unsigned pad;
-	char *city1, *city2;
-};
-
-struct RemRoad {
+	/// the starting city for the route
 	char *city1;
+	/// the final city of the route
 	char *city2;
 };
 
+/// A struct storing information about the removeRoad parser command.
+ struct RemRoad {
+	 /// a city that the road due for removal is connected to
+	char *city1;
+	/// a city that the road due for removal is connected to
+	char *city2;
+};
+
+/// A struct storing information about the removeRoute parser command.
 struct RemRoute {
+	/// the id of the route to be removed
 	unsigned routeId;
+	/// explicit struct padding
 	unsigned pad;
 };
 
+/** A struct storing information about the repairRoad parser command.
+ *
+ */
 struct Repair {
+	/// a city connected to the road due for repair
 	char *city1;
+	/// a city connected to the road due for repair
 	char *city2;
+	/// the year of the repair to be recorded
 	int repairYear;
+	/// explicit struct padding
 	int pad;
 };
 
+/** A struct used to simplify parsing.
+ * Stores a string and the next function to be used when parsing
+ * that string.
+ */
 struct Word {
+	/// the remainder of the parser command
 	const char *str;
+	/// the function used to parse the next part of the string
 	size_t (*fun)(const char *);
 };
 
+//! @cond
 static bool charIsLetter(char c);
 static bool isAddition(const char *str);
 static bool isComment(const char *str);
@@ -108,14 +156,12 @@ static NewRoute *getNewRoute(char *str);
 static RemRoad *getRemRoad(char *str);
 static RemRoute *getRemRoute(char *str);
 static Repair *getRepair(char *str);
+//! @endcond
 
+/// the main map structure
 static Map *globalMap = NULL;
+/// the number of the line, used for error messages
 static size_t lineNumber = 0;
-
-//todo: remove
-void bp() {
-
-}
 
 bool setMap() {
 	assert(globalMap == NULL);
@@ -185,22 +231,7 @@ void parserRead(char *line) {
 	free(line);
 }
 
-void parserExamples() {
-	assert(isAddition("addRoad;a;b;1;10"));
-	assert(isComment("#"));
-	assert(isDescription("getRouteDescription;10"));
-	assert(isExtension("extendRoute;10;a"));
-	assert(isNewRoute("newRoute;10;a;b"));
-	assert(isRemRoad("removeRoad;a;b"));
-	assert(isRemRoute("removeRoute;10"));
-	assert(isRepair("repairRoad;a;b;-1"));
-}
-
 int runParser(void) {
-	// todo: remove
-//#undef stdin
-//	stdin = fopen("./t.in", "r");
-
 	bool success_init;
 	success_init = setMap();
 	if (!success_init)
@@ -222,6 +253,7 @@ int runParser(void) {
 	}
 }
 
+//! @cond
 static bool isAddition(const char *str) {
 	str = acceptPrefix(str, "addRoad");
 	for (size_t i = 0; i < 2; ++i)
@@ -610,7 +642,7 @@ static void doExtension(Extension *ptr) {
 	writeError();
 }
 
-void doNewRoute(NewRoute *ptr) {
+static void doNewRoute(NewRoute *ptr) {
 	if (ptr) {
 		bool success;
 		success = newRoute(globalMap, ptr->routeId, ptr->city1, ptr->city2);
@@ -621,7 +653,7 @@ void doNewRoute(NewRoute *ptr) {
 	writeError();
 }
 
-RemRoad *getRemRoad(char *str) {
+static RemRoad *getRemRoad(char *str) {
 	RemRoad *ans = malloc(sizeof(RemRoad));
 	if (ans) {
 		strtok(str, ";");
@@ -636,7 +668,7 @@ RemRoad *getRemRoad(char *str) {
 	return NULL;
 }
 
-void doRemRoad(RemRoad *ptr) {
+static void doRemRoad(RemRoad *ptr) {
 	if (ptr) {
 		bool success;
 		success = removeRoad(globalMap, ptr->city1, ptr->city2);
@@ -647,7 +679,7 @@ void doRemRoad(RemRoad *ptr) {
 	writeError();
 }
 
-void doRemRoute(RemRoute *ptr) {
+static void doRemRoute(RemRoute *ptr) {
 	if (ptr) {
 		bool success;
 		success = removeRoute(globalMap, ptr->routeId);
@@ -658,7 +690,7 @@ void doRemRoute(RemRoute *ptr) {
 	writeError();
 }
 
-RemRoute *getRemRoute(char *str) {
+static RemRoute *getRemRoute(char *str) {
 	RemRoute *ans = malloc(sizeof(RemRoute));
 	if (ans) {
 		strtok(str, ";");
@@ -678,4 +710,4 @@ static const char *acceptPrefix(const char *str, const char *prefix) {
 	else
 		return NULL;
 }
-
+//! @endcond

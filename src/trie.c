@@ -10,18 +10,32 @@
 typedef struct Key Key;
 typedef struct TrieStore TrieStore;
 
+/// Used to access information inside the trie.
 struct Key {
+	/// the string represented by the key
 	const char *str;
-	size_t depth, length;
+	/// the number of nodes already traversed
+	size_t depth;
+	/// the total length of the string
+	size_t length;
 };
 
+/// A recursive structure mapping strings to city pointers.
 struct Trie {
+	/// the stored pointer
 	City *val;
+	/// the nodes directly below
 	Trie *children[SQRT_256];
 };
 
+/** Stores pre-allocated memory for trie insertion.
+ * Used to allocate all required memory in advance. This prevents the
+ * operation failing in the middle of a series of insertions.
+ */
 struct TrieStore {
+	/// the number of pointers allocated
 	size_t length;
+	/// the allocated pointers
 	Trie **arr;
 };
 

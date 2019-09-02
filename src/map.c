@@ -6,13 +6,19 @@
 #include "trunk.h"
 #include "trie.h"
 
+/// A structure storing the trunk road map.
 struct Map {
+	/// a structure storing the cities in the map
 	CityMap *cities;
+	/// a structure storing the roads in the map
 	RoadMap *roads;
+	/// all routes in the map, indexed by id
 	Trunk *routes[ROUTE_LIMIT];
+	/// a structure storing references to cities for fast lookup by name
 	Trie *trie;
 };
 
+//! @cond
 static bool addFromList(Map *map, NameList list, const int *years, const unsigned *roadLengths);
 static bool correctRoute(unsigned routeId, const char *name1, const char *name2);
 static bool destroyRoad(Map *map, Road *road);
@@ -31,6 +37,7 @@ static Road *find(Trie *trie, const char *city1, const char *city2);
 static bool testInvariants(Map *map);
 static bool *whichTrunks(const Map *map);
 #endif // NDEBUG
+//! @endcond
 
 Map *newMap(void) {
 	Map *ans = calloc(1, sizeof(Map));
@@ -91,7 +98,7 @@ bool addRoad(Map *map, const char *city1, const char *city2, unsigned length, in
 			ans = roadExtend(map->cities, map->trie, c2, info);
 		}
 		if (!c1 && !c2)
-			ans = cityMapLoneRoad(map->cities, map->trie, info);
+			ans = roadLoneRoad(map->cities, map->trie, info);
 	}
 	if (ans && c1) {
 		(void) count1;
@@ -208,10 +215,6 @@ Trunk **rebuildTrunks(CityMap *cityMap, Road *road, Trunk *trunks[ROUTE_LIMIT]) 
 	return replacements;
 }
 
-void destroyTrunk(Trunk *trunks[ROUTE_LIMIT], unsigned trunkId) {
-	trunkDestroy(&trunks[trunkId]);
-}
-
 bool routeFromList(
 		Map *map,
 		unsigned id,
@@ -268,6 +271,7 @@ bool removeRoute(Map *map, unsigned routeId) {
 	return true;
 }
 
+//! @endcond
 static bool destroyRoad(Map *map, Road *road) {
 	City *city1, *city2;
 	roadGetCities(road, &city1, &city2);
@@ -371,7 +375,6 @@ static bool testRoute(Map *map, const char **names, const int *years, const unsi
 	return ans;
 }
 
-//todo: out of memory handling
 static bool addFromList(Map *map, NameList list, const int *years, const unsigned *roadLengths) {
 	for (size_t i = 1; i < list.length; ++i) {
 		const char *city1 = list.v[i - 1];
@@ -386,7 +389,6 @@ static bool addFromList(Map *map, NameList list, const int *years, const unsigne
 					years[i - 1]
 			);
 			if (!addSuccess) {
-				// todo
 				assert(false);
 				return false;
 			}
@@ -395,7 +397,6 @@ static bool addFromList(Map *map, NameList list, const int *years, const unsigne
 		assert(road);
 		bool reserveSuccess = roadReserve(road);
 		if (!reserveSuccess) {
-			// todo
 			assert(false);
 			return false;
 		}
@@ -439,7 +440,6 @@ static void repairFromList(Map *map, NameList list, const int *years) {
 #ifndef NDEBUG
 static bool testInvariants(Map *map) {
 	if (!roadMapTestCount(map->roads)) {
-		bp();
 		return false;
 	}
 	{
@@ -447,7 +447,6 @@ static bool testInvariants(Map *map) {
 		success = roadMapTestTrunk(map->roads, trunks);
 		free(trunks);
 		if (!success) {
-			bp();
 			return false;
 		}
 	}
@@ -457,7 +456,6 @@ static bool testInvariants(Map *map) {
 		for (size_t i = 0; i < ROUTE_LIMIT; ++i) {
 			if (map->routes[i])
 				if (!trunkTest(map->routes[i])) {
-					bp();
 					return false;
 				}
 		}
@@ -476,3 +474,4 @@ static bool *whichTrunks(const Map *map) {
 	return ans;
 }
 #endif // NDEBUG
+//! @endcond

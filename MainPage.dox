@@ -1,14 +1,12 @@
 /**
-@mainpage Dokumentacja zadania drogi
+@mainpage Project documentation - map
 
-### Treść zadania
+### The task
 
-Uwaga: aktualna treść zadania znajduje się w [Moodle'u](https://moodle.mimuw.edu.pl).
+The task description is available at [Moodle](https://moodle.mimuw.edu.pl).
 
-### Opis programu
+### Program description
 
-Tegoroczne duże zadanie polega na zaimplementowaniu operacji na mapach drogowych.
-
-TODO
+This year's task is an implementation of road map operations.
 
 */
